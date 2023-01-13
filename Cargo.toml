@@ -9,7 +9,7 @@ authors = [ "Robin O'Connell" ]
 
 [dependencies]
 clap = { version = "4.1.0", features = ["derive"] }
-configparser = "3.0.2"
 flate2 = "1.0.25"
 regex = "1.7.1"
+rust-ini = "0.18.0"
 sha1 = "0.10.5"
