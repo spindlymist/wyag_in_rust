@@ -1,7 +1,13 @@
 pub mod cli;
 pub use cli::Cli;
 
+use std::{
+    path::{Path, PathBuf},
+    error,
+    fmt,
+};
 use cli::*;
+use ini::Ini;
 
 pub fn run(cli: Cli) {
     match cli.command {
@@ -22,6 +28,61 @@ pub fn run(cli: Cli) {
         Commands::Tag(args) => cmd_tag(args),
     };
 }
+
+pub struct GitRepository {
+    working_dir: PathBuf,
+    git_dir: PathBuf,
+    config: Ini,
+}
+
+impl GitRepository {
+    pub fn from_dir(dir: &Path) -> Result<GitRepository, Error> {
+        let working_dir = PathBuf::from(dir);
+        if !working_dir.is_dir() {
+            return Err(Error::WorkingDirectoryInvalid);
+        }
+
+        let git_dir = working_dir.join(".git");
+        if !git_dir.is_dir() {
+            return Err(Error::DirectoryNotInitialized);
+        }
+
+        let config_file = git_dir.join("config");
+        let config = match Ini::load_from_file(config_file) {
+            Ok(cfg) => cfg,
+            Err(err) => return Err(Error::FailedToLoadConfig(err.to_string())),
+        };
+
+        match config.get_from(Some("core"), "repositoryformatversion") {
+            Some("0") => (),
+            Some(version) => return Err(Error::UnsupportedRepoFmtVersion(String::from(version))),
+            None => return Err(Error::RepoFmtVersionMissing),
+        };
+
+        Ok(GitRepository {
+            working_dir,
+            git_dir,
+            config,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub enum Error {
+    WorkingDirectoryInvalid,
+    DirectoryNotInitialized,
+    FailedToLoadConfig(String),
+    RepoFmtVersionMissing,
+    UnsupportedRepoFmtVersion(String),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+impl error::Error for Error {}
 
 fn cmd_add(args: AddArgs) {
     
