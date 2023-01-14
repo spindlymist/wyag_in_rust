@@ -38,8 +38,11 @@ pub struct GitRepository {
 }
 
 impl GitRepository {
-    pub fn init(dir: &Path) -> Result<GitRepository, Error> {
-        let working_dir = PathBuf::from(dir);
+    pub fn init<P>(dir: P) -> Result<GitRepository, Error>
+    where
+        P: AsRef<Path>
+    {
+        let working_dir = PathBuf::from(dir.as_ref());
         if working_dir.is_file() {
             return Err(Error::InitPathIsFile);
         }
@@ -87,8 +90,11 @@ impl GitRepository {
         Ok(repo)
     }
 
-    pub fn from_dir(dir: &Path) -> Result<GitRepository, Error> {
-        let working_dir = PathBuf::from(dir);
+    pub fn from_dir<P>(dir: P) -> Result<GitRepository, Error>
+    where
+        P: AsRef<Path>
+    {
+        let working_dir = PathBuf::from(dir.as_ref());
         if !working_dir.is_dir() {
             return Err(Error::WorkingDirectoryInvalid);
         }
