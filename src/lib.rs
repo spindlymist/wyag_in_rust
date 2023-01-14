@@ -38,6 +38,55 @@ pub struct GitRepository {
 }
 
 impl GitRepository {
+    pub fn init(dir: &Path) -> Result<GitRepository, Error> {
+        let working_dir = PathBuf::from(dir);
+        if working_dir.is_file() {
+            return Err(Error::InitPathIsFile);
+        }
+        else if working_dir.is_dir() {
+            match working_dir.read_dir() {
+                Ok(mut files) => {
+                    if files.next().is_some() {
+                        return Err(Error::InitDirectoryNotEmpty);
+                    }
+                },
+                Err(err) => return Err(err.into()),
+            }
+        }
+
+        let git_dir = working_dir.join(".git");
+        fs::create_dir_all(&git_dir)?;
+
+        let mut config = Ini::new();
+        config.with_section(Some("core"))
+            .set("repositoryformatversion", "0")
+            .set("filemode", "false")
+            .set("bare", "false");
+
+        let repo = GitRepository {
+            working_dir,
+            git_dir,
+            config,
+        };
+
+        repo_dir(&repo, "branches")?;
+        repo_dir(&repo, "objects")?;
+        repo_dir(&repo, "refs/tags")?;
+        repo_dir(&repo, "refs/heads")?;
+
+        {
+            let description_file = repo_file(&repo, "description")?;
+            fs::write(description_file, "Unnamed repository; edit this file 'description' to name the repostiory.\n")?;
+        }
+
+        {
+            let head_file = repo_file(&repo, "HEAD")?;
+            fs::write(head_file, "ref: refs/heads/master\n")?;
+        }
+
+        Ok(repo)
+    }
+
     pub fn from_dir(dir: &Path) -> Result<GitRepository, Error> {
         let working_dir = PathBuf::from(dir);
         if !working_dir.is_dir() {
@@ -76,6 +125,9 @@ pub enum Error {
     FailedToLoadConfig(String),
     RepoFmtVersionMissing,
     UnsupportedRepoFmtVersion(String),
+    InitPathIsFile,
+    InitDirectoryNotEmpty,
+    FailedToCreateDirectory(io::Error),
     IoError(io::Error),
 }
 
