@@ -5,6 +5,8 @@ use std::{
     path::{Path, PathBuf},
     error,
     fmt,
+    fs,
+    io,
 };
 use cli::*;
 use ini::Ini;
@@ -83,6 +85,32 @@ impl fmt::Display for Error {
 }
 
 impl error::Error for Error {}
+
+fn repo_path(repo: &GitRepository, path: &Path) -> PathBuf {
+    repo.git_dir.join(path)
+}
+
+fn repo_file(repo: &GitRepository, path: &Path) -> Result<PathBuf, io::Error> {
+    if let Some(parent_path) = path.parent() {
+        repo_dir(repo, parent_path)?;
+    }
+
+    Ok(repo_path(repo, path))
+}
+
+fn repo_dir(repo: &GitRepository, path: &Path) -> Result<PathBuf, io::Error> {
+    let path = repo_path(&repo, path);
+
+    if path.is_dir() {
+        Ok(path)
+    }
+    else {
+        match fs::create_dir_all(&path) {
+            Ok(_) => Ok(path),
+            Err(err) => Err(err),
+        }
+    }
+}
 
 fn cmd_add(args: AddArgs) {
     
