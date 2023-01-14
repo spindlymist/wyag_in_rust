@@ -76,6 +76,7 @@ pub enum Error {
     FailedToLoadConfig(String),
     RepoFmtVersionMissing,
     UnsupportedRepoFmtVersion(String),
+    IoError(io::Error),
 }
 
 impl fmt::Display for Error {
@@ -86,30 +87,41 @@ impl fmt::Display for Error {
 
 impl error::Error for Error {}
 
-fn repo_path(repo: &GitRepository, path: &Path) -> PathBuf {
+impl From<io::Error> for Error {
+    fn from(value: io::Error) -> Self {
+        Error::IoError(value)
+    }
+}
+
+fn repo_path<P>(repo: &GitRepository, path: P) -> PathBuf
+where
+    P: AsRef<Path>
+{
     repo.git_dir.join(path)
 }
 
-fn repo_file(repo: &GitRepository, path: &Path) -> Result<PathBuf, io::Error> {
-    if let Some(parent_path) = path.parent() {
+fn repo_file<P>(repo: &GitRepository, path: P) -> Result<PathBuf, Error>
+where
+    P: AsRef<Path>
+{
+    if let Some(parent_path) = path.as_ref().parent() {
         repo_dir(repo, parent_path)?;
     }
 
     Ok(repo_path(repo, path))
 }
 
-fn repo_dir(repo: &GitRepository, path: &Path) -> Result<PathBuf, io::Error> {
-    let path = repo_path(&repo, path);
+fn repo_dir<P>(repo: &GitRepository, path: P) -> Result<PathBuf, Error>
+where
+    P: AsRef<Path>
+{
+    let path = repo_path(&repo, path.as_ref());
 
-    if path.is_dir() {
-        Ok(path)
+    if !path.is_dir() {
+        fs::create_dir_all(&path)?;
     }
-    else {
-        match fs::create_dir_all(&path) {
-            Ok(_) => Ok(path),
-            Err(err) => Err(err),
-        }
-    }
+    
+    Ok(path)
 }
 
 fn cmd_add(args: AddArgs) {
