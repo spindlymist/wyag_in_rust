@@ -1,6 +1,3 @@
-pub mod cli;
-pub use cli::Cli;
-
 use std::{
     path::{Path, PathBuf},
     error,
@@ -8,8 +5,11 @@ use std::{
     fs,
     io,
 };
-use cli::*;
 use ini::Ini;
+
+mod commands;
+use commands::*;
+pub use commands::Cli;
 
 pub fn run(cli: Cli) {
     match cli.command {
@@ -174,64 +174,4 @@ where
     }
     
     Ok(path)
-}
-
-fn cmd_add(args: AddArgs) {
-    
-}
-
-fn cmd_cat_file(args: CatFileArgs) {
-    
-}
-
-fn cmd_checkout(args: CheckoutArgs) {
-    
-}
-
-fn cmd_commit(args: CommitArgs) {
-    
-}
-
-fn cmd_hash_object(args: HashObjectArgs) {
-    
-}
-
-fn cmd_init(args: InitArgs) {
-    
-}
-
-fn cmd_log(args: LogArgs) {
-    
-}
-
-fn cmd_ls_files(args: LsFilesArgs) {
-    
-}
-
-fn cmd_ls_tree(args: LsTreeArgs) {
-    
-}
-
-fn cmd_merge(args: MergeArgs) {
-    
-}
-
-fn cmd_rebase(args: RebaseArgs) {
-    
-}
-
-fn cmd_rev_parse(args: RevParseArgs) {
-    
-}
-
-fn cmd_rm(args: RmArgs) {
-    
-}
-
-fn cmd_show_ref(args: ShowRefArgs) {
-    
-}
-
-fn cmd_tag(args: TagArgs) {
-    
 }
