@@ -79,7 +79,7 @@ impl GitRepository {
 
         {
             let description_file = repo_file(&repo, "description")?;
-            fs::write(description_file, "Unnamed repository; edit this file 'description' to name the repostiory.\n")?;
+            fs::write(description_file, "Unnamed repository; edit this file 'description' to name the repository.\n")?;
         }
 
         {
