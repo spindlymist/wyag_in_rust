@@ -65,6 +65,7 @@ impl GitRepository {
             .set("repositoryformatversion", "0")
             .set("filemode", "false")
             .set("bare", "false");
+        config.write_to_file(git_dir.join("config"))?;
 
         let repo = GitRepository {
             working_dir,
