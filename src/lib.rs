@@ -106,10 +106,7 @@ impl GitRepository {
         }
 
         let config_file = git_dir.join("config");
-        let config = match Ini::load_from_file(config_file) {
-            Ok(cfg) => cfg,
-            Err(err) => return Err(Error::FailedToLoadConfig(err.to_string())),
-        };
+        let config = Ini::load_from_file(config_file)?;
 
         match config.get_from(Some("core"), "repositoryformatversion") {
             Some("0") => (),
@@ -129,13 +126,13 @@ impl GitRepository {
 pub enum Error {
     WorkingDirectoryInvalid,
     DirectoryNotInitialized,
-    FailedToLoadConfig(String),
     RepoFmtVersionMissing,
     UnsupportedRepoFmtVersion(String),
     InitPathIsFile,
     InitDirectoryNotEmpty,
     FailedToCreateDirectory(io::Error),
     IoError(io::Error),
+    Ini(ini::Error),
 }
 
 impl fmt::Display for Error {
@@ -149,6 +146,12 @@ impl error::Error for Error {}
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
         Error::IoError(value)
+    }
+}
+
+impl From<ini::Error> for Error {
+    fn from(value: ini::Error) -> Self {
+        Error::Ini(value)
     }
 }
 
