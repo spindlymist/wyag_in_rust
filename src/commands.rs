@@ -5,7 +5,9 @@ use std::{
 };
 use clap::{Parser, Subcommand, Args};
 
-use crate::GitRepository;
+use crate::{
+    repo::GitRepository,
+};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
