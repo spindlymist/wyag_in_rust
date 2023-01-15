@@ -1,6 +1,11 @@
 #![allow(dead_code)]
 
+use std::{
+    path::PathBuf,
+};
 use clap::{Parser, Subcommand, Args};
+
+use crate::GitRepository;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -73,13 +78,22 @@ pub fn cmd_hash_object(args: HashObjectArgs) {
     
 }
 
+/// Creates a new git repository.
 #[derive(Args)]
 pub struct InitArgs {
-    
+    /// Where to create the repository.
+    path: Option<PathBuf>,
 }
 
 pub fn cmd_init(args: InitArgs) {
-    
+    let path = args.path.unwrap_or(PathBuf::from("."));
+    match GitRepository::init(&path) {
+        Ok(_) => println!("Successfully initialized git repository at {}", path.to_string_lossy()),
+        Err(err) => {
+            eprintln!("Failed to initialize git repository at {}:", path.to_string_lossy());
+            eprintln!("{err}");
+        }
+    };
 }
 
 #[derive(Args)]
