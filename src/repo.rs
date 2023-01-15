@@ -1,6 +1,7 @@
 use std::{
     path::{Path, PathBuf},
-    fs,
+    fs::{self, File, OpenOptions},
+    io::{Write},
 };
 use ini::Ini;
 
@@ -19,7 +20,7 @@ impl GitRepository {
     where
         P: AsRef<Path>
     {
-        let working_dir = PathBuf::from(dir.as_ref());
+        let working_dir = dir.as_ref().canonicalize()?;
         if working_dir.is_file() {
             return Err(Error::InitPathIsFile);
         }
@@ -42,28 +43,31 @@ impl GitRepository {
             .set("repositoryformatversion", "0")
             .set("filemode", "false")
             .set("bare", "false");
-        config.write_to_file(git_dir.join("config"))?;
-
+            
         let repo = GitRepository {
             working_dir,
             git_dir,
             config,
         };
+        
+        repo_make_dir(&repo, "branches")?;
+        repo_make_dir(&repo, "objects")?;
+        repo_make_dir(&repo, "refs/tags")?;
+        repo_make_dir(&repo, "refs/heads")?;
 
-        repo_dir(&repo, "branches")?;
-        repo_dir(&repo, "objects")?;
-        repo_dir(&repo, "refs/tags")?;
-        repo_dir(&repo, "refs/heads")?;
+        let mut options = OpenOptions::new();
+        options
+            .create(true)
+            .append(true);
 
-        {
-            let description_file = repo_file(&repo, "description")?;
-            fs::write(description_file, "Unnamed repository; edit this file 'description' to name the repository.\n")?;
-        }
+        let mut description_file = repo_open_file(&repo, "description", Some(&options))?;
+        description_file.write_all(b"Unnamed repository; edit this file 'description' to name the repository.\n")?;
 
-        {
-            let head_file = repo_file(&repo, "HEAD")?;
-            fs::write(head_file, "ref: refs/heads/master\n")?;
-        }
+        let mut head_file = repo_open_file(&repo, "HEAD", Some(&options))?;
+        head_file.write_all(b"ref: refs/heads/master\n")?;
+
+        let mut config_file = repo_open_file(&repo, "config", Some(&options))?;
+        repo.config.write_to(&mut config_file)?;
 
         Ok(repo)
     }
@@ -106,18 +110,23 @@ where
     repo.git_dir.join(path)
 }
 
-pub fn repo_file<P>(repo: &GitRepository, path: P) -> Result<PathBuf, Error>
+pub fn repo_open_file<P>(repo: &GitRepository, path: P, options: Option<&OpenOptions>) -> Result<File, Error>
 where
     P: AsRef<Path>
 {
     if let Some(parent_path) = path.as_ref().parent() {
-        repo_dir(repo, parent_path)?;
+        repo_make_dir(repo, parent_path)?;
     }
 
-    Ok(repo_path(repo, path))
+    if let Some(options) = options {
+        Ok(options.open(path)?)
+    }
+    else {
+        Ok(File::open(path)?)
+    }
 }
 
-pub fn repo_dir<P>(repo: &GitRepository, path: P) -> Result<PathBuf, Error>
+pub fn repo_make_dir<P>(repo: &GitRepository, path: P) -> Result<PathBuf, Error>
 where
     P: AsRef<Path>
 {
