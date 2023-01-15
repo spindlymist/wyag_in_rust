@@ -131,7 +131,7 @@ pub enum Error {
     InitPathIsFile,
     InitDirectoryNotEmpty,
     FailedToCreateDirectory(io::Error),
-    IoError(io::Error),
+    Io(io::Error),
     Ini(ini::Error),
 }
 
@@ -145,7 +145,7 @@ impl error::Error for Error {}
 
 impl From<io::Error> for Error {
     fn from(value: io::Error) -> Self {
-        Error::IoError(value)
+        Error::Io(value)
     }
 }
 
