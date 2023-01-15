@@ -152,3 +152,26 @@ where
     
     Ok(path)
 }
+
+/// Finds the git repository that contains `path` (if it exists).
+fn repo_find<P>(path: P) -> Result<GitRepository, Error>
+where
+    P: AsRef<Path>
+{
+    let abs_path = fs::canonicalize(path)?;
+
+    // The existence of a .git directory is considered sufficient
+    // evidence of a repository
+    if abs_path.join(".git").is_dir() {
+        return GitRepository::from_dir(&abs_path);
+    }
+
+    // Recurse up the directory tree
+    if let Some(parent_path) = abs_path.parent() {
+        repo_find(parent_path)
+    }
+    else {
+        // Reached root without finding a .git directory
+        Err(Error::DirectoryNotInitialized)
+    }
+}
