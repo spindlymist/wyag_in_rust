@@ -12,7 +12,6 @@ pub enum Error {
     UnsupportedRepoFmtVersion(String),
     InitPathIsFile,
     InitDirectoryNotEmpty,
-    FailedToCreateDirectory(io::Error),
     Io(io::Error),
     Ini(ini::Error),
 }
