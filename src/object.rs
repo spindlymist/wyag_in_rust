@@ -1,8 +1,11 @@
 use std::{
     path::{PathBuf},
-    io::{Read},
+    io::{Read, Write},
     str,
 };
+
+use sha1::{Sha1, Digest};
+use flate2::{read::ZlibDecoder, write::ZlibEncoder};
 
 use crate::{
     error::Error,
@@ -61,7 +64,7 @@ pub fn object_read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject,
     // Read and decompress
     {
         let object_file = repo_open_file(&repo, &hash.path, None)?;
-        let mut decoder = flate2::read::ZlibDecoder::new(object_file);
+        let mut decoder = ZlibDecoder::new(object_file);
         decoder.read_to_end(&mut buf)?;
     }
 
