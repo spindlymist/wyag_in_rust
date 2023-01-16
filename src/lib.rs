@@ -6,6 +6,7 @@ mod error;
 pub use error::Error;
 
 mod repo;
+mod object;
 
 pub fn run(cli: Cli) {
     match cli.command {

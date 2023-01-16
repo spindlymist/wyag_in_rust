@@ -12,6 +12,8 @@ pub enum Error {
     UnsupportedRepoFmtVersion(String),
     InitPathIsFile,
     InitDirectoryNotEmpty,
+    InvalidObjectHeader(String),
+    UnrecognizedObjectFormat,
     Io(io::Error),
     Ini(ini::Error),
 }
