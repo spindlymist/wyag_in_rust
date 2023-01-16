@@ -16,7 +16,9 @@ pub enum GitObject {
     Commit,
     Tree,
     Tag,
-    Blob,
+    Blob {
+        data: Vec<u8>,
+    },
 }
 
 impl GitObject {
@@ -25,7 +27,7 @@ impl GitObject {
             GitObject::Commit => "commit",
             GitObject::Tree => "tree",
             GitObject::Tag => "tag",
-            GitObject::Blob => "blob",
+            GitObject::Blob {..} => "blob",
         }
     }
 
@@ -35,7 +37,7 @@ impl GitObject {
             GitObject::Commit => self.serialize_commit(),
             GitObject::Tree => self.serialize_tree(),
             GitObject::Tag => self.serialize_tag(),
-            GitObject::Blob => self.serialize_blob(),
+            GitObject::Blob { data } => self.serialize_blob(data),
         };
         
         let size = data.len();
@@ -58,7 +60,7 @@ impl GitObject {
         Vec::new()
     }
 
-    fn serialize_blob(&self) -> Vec<u8> {
+    fn serialize_blob(&self, data: &Vec<u8>) -> Vec<u8> {
         Vec::new()
     }
 
@@ -85,7 +87,9 @@ impl GitObject {
     }
 
     fn deserialize_blob(data: &[u8]) -> Result<Self, Error> {
-        Ok(GitObject::Blob)
+        Ok(GitObject::Blob {
+            data: Vec::from(data)
+        })
     }
 }
 
