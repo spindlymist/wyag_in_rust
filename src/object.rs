@@ -57,6 +57,32 @@ pub struct ObjectHash {
     path: PathBuf,
 }
 
+impl ObjectHash {
+    pub fn new(data: impl AsRef<[u8]>) -> ObjectHash {
+        let raw = Sha1::new()
+            .chain_update(data)
+            .finalize()
+            .as_slice()
+            .try_into()
+            .expect("Sha1 hash should always be 20 bytes");
+        let string = Self::make_string(&raw);
+        let path = Self::make_path(&string);
+
+        ObjectHash { raw, string, path, }
+    }
+
+    fn make_string(raw_hash: &[u8; 20]) -> String {
+        base16ct::upper::encode_string(raw_hash)
+    }
+
+    fn make_path(string_hash: &String) -> PathBuf {
+        let directory = &string_hash[..2];
+        let file = &string_hash[2..];
+
+        [directory, file].iter().collect()
+    }
+}
+
 /// Read the object that hashes to `hash` from `repo`.
 pub fn object_read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject, Error> {
     let mut buf = Vec::new(); // perhaps reserve some capacity here?
