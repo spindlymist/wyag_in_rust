@@ -20,8 +20,46 @@ pub enum GitObject {
 }
 
 impl GitObject {
+    pub fn get_format(&self) -> &'static str {
+        match self {
+            GitObject::Commit => "commit",
+            GitObject::Tree => "tree",
+            GitObject::Tag => "tag",
+            GitObject::Blob => "blob",
+        }
+    }
+
     pub fn serialize(&self) -> Vec<u8> {
-        vec![]
+        let format = self.get_format();
+        let mut data = match self {
+            GitObject::Commit => self.serialize_commit(),
+            GitObject::Tree => self.serialize_tree(),
+            GitObject::Tag => self.serialize_tag(),
+            GitObject::Blob => self.serialize_blob(),
+        };
+        
+        let size = data.len();
+
+        let header = format!("{format} {size}\0").into_bytes().into_iter();
+        data.splice(0..0, header);
+
+        data
+    }
+
+    fn serialize_commit(&self) -> Vec<u8> {
+        Vec::new()
+    }
+
+    fn serialize_tree(&self) -> Vec<u8> {
+        Vec::new()
+    }
+
+    fn serialize_tag(&self) -> Vec<u8> {
+        Vec::new()
+    }
+
+    fn serialize_blob(&self) -> Vec<u8> {
+        Vec::new()
     }
 
     pub fn deserialize(format: &str, data: &[u8]) -> Result<Self, Error> {
@@ -126,4 +164,23 @@ pub fn object_read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject,
     }
 
     GitObject::deserialize(format, &data)
+}
+
+const COMPRESSION_LEVEL: u32 = 6;
+
+fn object_write(repo: &GitRepository, object: &GitObject) -> Result<ObjectHash, Error> {
+    let data = object.serialize();
+    let hash = ObjectHash::new(&data);
+
+    let mut options = std::fs::OpenOptions::new();
+    options
+        .create(true)
+        .write(true)
+        .truncate(true);
+    let object_file = repo_open_file(&repo, &hash.path, Some(&options))?;
+
+    let mut encoder = ZlibEncoder::new(object_file, flate2::Compression::new(COMPRESSION_LEVEL));
+    encoder.write_all(&data)?;
+
+    Ok(hash)
 }
