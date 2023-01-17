@@ -13,6 +13,7 @@ pub enum Error {
     InitPathIsFile,
     InitDirectoryNotEmpty,
     InvalidObjectHeader(String),
+    InvalidObjectHash,
     UnrecognizedObjectFormat,
     Io(io::Error),
     Ini(ini::Error),

@@ -6,8 +6,9 @@ use std::{
 use clap::{Parser, Subcommand, Args};
 
 use crate::{
-    repo::GitRepository,
     error::Error,
+    repo::{GitRepository, repo_find},
+    object::{GitObject, ObjectHash, object_read, object_write, object_find},
 };
 
 #[derive(Parser)]
@@ -45,13 +46,32 @@ pub fn cmd_add(args: AddArgs) -> Result<(), Error> {
     Ok(())
 }
 
+#[derive(clap::ValueEnum, Clone)]
+enum ObjectFormat {
+    Commit,
+    Tree,
+    Tag,
+    Blob,
+}
+
 /// Displays contents of repository object
 #[derive(Args)]
 pub struct CatFileArgs {
-    
+    /// The type of object to display
+    #[arg(id = "TYPE")]
+    object_type: ObjectFormat,
+
+    /// The object to display
+    object: String,
 }
 
 pub fn cmd_cat_file(args: CatFileArgs) -> Result<(), Error> {
+    let repo = repo_find(".")?;
+    let hash = object_find(&repo, args.object)?;
+    let object = object_read(&repo, &hash)?;
+
+    println!("{}", String::from_utf8_lossy(&object.serialize()));
+
     Ok(())
 }
 
@@ -73,12 +93,43 @@ pub fn cmd_commit(args: CommitArgs) -> Result<(), Error> {
     Ok(())
 }
 
+/// Computes object hash and optionally creates a blob from a file.
 #[derive(Args)]
 pub struct HashObjectArgs {
-    
+    /// Actually write the object into the database
+    #[arg(short, long)]
+    write: bool,
+
+    /// The type of the object
+    #[arg(id = "type", short, long)]
+    format: Option<ObjectFormat>,
+
+    /// Path to read the object from
+    path: PathBuf,
 }
 
 pub fn cmd_hash_object(args: HashObjectArgs) -> Result<(), Error> {
+    // move some of this logic to object module?
+    let format = match args.format.unwrap_or(ObjectFormat::Blob) {
+        ObjectFormat::Commit => "commit",
+        ObjectFormat::Tree => "tree",
+        ObjectFormat::Tag => "tag",
+        ObjectFormat::Blob {..} => "blob",
+    };
+    let data = std::fs::read_to_string(args.path)?.into_bytes();
+    let object = GitObject::deserialize(format, data)?;
+    let hash;
+
+    if args.write {
+        let repo = repo_find(".")?;
+        hash = object_write(&repo, &object)?;
+    }
+    else {
+        hash = ObjectHash::new(object.serialize());
+    }
+
+    println!("{}", hash);
+
     Ok(())
 }
 

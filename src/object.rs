@@ -64,7 +64,7 @@ impl GitObject {
         Vec::new()
     }
 
-    pub fn deserialize(format: &str, data: &[u8]) -> Result<Self, Error> {
+    pub fn deserialize(format: &str, data: Vec<u8>) -> Result<Self, Error> {
         match format {
             "commit" => Self::deserialize_commit(data),
             "tree" => Self::deserialize_tree(data),
@@ -74,21 +74,21 @@ impl GitObject {
         }
     }
 
-    fn deserialize_commit(data: &[u8]) -> Result<Self, Error> {
+    fn deserialize_commit(data: Vec<u8>) -> Result<Self, Error> {
         Ok(GitObject::Commit)
     }
 
-    fn deserialize_tree(data: &[u8]) -> Result<Self, Error> {
+    fn deserialize_tree(data: Vec<u8>) -> Result<Self, Error> {
         Ok(GitObject::Tree)
     }
 
-    fn deserialize_tag(data: &[u8]) -> Result<Self, Error> {
+    fn deserialize_tag(data: Vec<u8>) -> Result<Self, Error> {
         Ok(GitObject::Tag)
     }
 
-    fn deserialize_blob(data: &[u8]) -> Result<Self, Error> {
+    fn deserialize_blob(data: Vec<u8>) -> Result<Self, Error> {
         Ok(GitObject::Blob {
-            data: Vec::from(data)
+            data
         })
     }
 }
@@ -117,12 +117,44 @@ impl ObjectHash {
         base16ct::upper::encode_string(raw_hash)
     }
 
-    fn make_path(string_hash: &String) -> PathBuf {
+    fn make_path(string_hash: &str) -> PathBuf {
         let directory = &string_hash[..2];
         let file = &string_hash[2..];
 
         [directory, file].iter().collect()
     }
+}
+
+impl std::fmt::Display for ObjectHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.string)
+    }
+}
+
+impl TryFrom<String> for ObjectHash {
+    type Error = Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        let mut raw = [0u8; 20];
+        match base16ct::mixed::decode(&value, &mut raw) {
+            Ok(raw) => {
+                if raw.len() != 20 {
+                    return Err(Error::InvalidObjectHash);
+                }
+            },
+            Err(_) => return Err(Error::InvalidObjectHash),
+        };
+
+        let path = Self::make_path(&value);
+
+        Ok(ObjectHash { raw, string: value, path, })
+    }
+}
+
+/// Finds the object in `repo` identified by `id`.
+pub fn object_find(repo: &GitRepository, id: String) -> Result<ObjectHash, Error> {
+    // For now, just try to parse id as an object hash
+    ObjectHash::try_from(id)
 }
 
 /// Read the object that hashes to `hash` from `repo`.
@@ -167,12 +199,12 @@ pub fn object_read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject,
         return Err(Error::InvalidObjectHeader(format!("Malformed object {}: incorrect length", hash.string)));
     }
 
-    GitObject::deserialize(format, &data)
+    GitObject::deserialize(format, data)
 }
 
 const COMPRESSION_LEVEL: u32 = 6;
 
-fn object_write(repo: &GitRepository, object: &GitObject) -> Result<ObjectHash, Error> {
+pub fn object_write(repo: &GitRepository, object: &GitObject) -> Result<ObjectHash, Error> {
     let data = object.serialize();
     let hash = ObjectHash::new(&data);
 
