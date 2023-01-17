@@ -9,7 +9,7 @@ mod repo;
 mod object;
 
 pub fn run(cli: Cli) {
-    match cli.command {
+    let result = match cli.command {
         Commands::Add(args) => cmd_add(args),
         Commands::CatFile(args) => cmd_cat_file(args),
         Commands::Checkout(args) => cmd_checkout(args),
@@ -26,4 +26,8 @@ pub fn run(cli: Cli) {
         Commands::ShowRef(args) => cmd_show_ref(args),
         Commands::Tag(args) => cmd_tag(args),
     };
+
+    if let Err(err) = result {
+        eprintln!("{err}");
+    }
 }
