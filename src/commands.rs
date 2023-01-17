@@ -109,7 +109,7 @@ pub struct HashObjectArgs {
 }
 
 pub fn cmd_hash_object(args: HashObjectArgs) -> Result<(), Error> {
-    // move some of this logic to object module?
+    // TODO move some of this logic to object module?
     let format = match args.format.unwrap_or(ObjectFormat::Blob) {
         ObjectFormat::Commit => "commit",
         ObjectFormat::Tree => "tree",

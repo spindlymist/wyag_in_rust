@@ -159,7 +159,7 @@ pub fn object_find(repo: &GitRepository, id: String) -> Result<ObjectHash, Error
 
 /// Read the object that hashes to `hash` from `repo`.
 pub fn object_read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject, Error> {
-    let mut buf = Vec::new(); // perhaps reserve some capacity here?
+    let mut buf = Vec::new(); // TODO perhaps reserve some capacity here?
 
     // Read and decompress
     {
