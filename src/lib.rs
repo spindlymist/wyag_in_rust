@@ -2,11 +2,12 @@ mod commands;
 use commands::*;
 pub use commands::Cli;
 
-mod error;
+pub mod error;
 pub use error::Error;
 
-mod repo;
-mod object;
+pub mod repo;
+pub mod object;
+pub mod kvlm;
 
 pub fn run(cli: Cli) {
     let result = match cli.command {
