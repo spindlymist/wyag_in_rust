@@ -4,6 +4,7 @@ use std::{
     str,
 };
 
+use ordered_multimap::ListOrderedMultimap;
 use sha1::{Sha1, Digest};
 use flate2::{read::ZlibDecoder, write::ZlibEncoder};
 
@@ -13,7 +14,10 @@ use crate::{
 };
 
 pub enum GitObject {
-    Commit,
+    Commit {
+        // TODO replace with a better model, following tutorial for now
+        map: ListOrderedMultimap<String, String>,
+    },
     Tree,
     Tag,
     Blob {
@@ -24,7 +28,7 @@ pub enum GitObject {
 impl GitObject {
     pub fn get_format(&self) -> &'static str {
         match self {
-            GitObject::Commit => "commit",
+            GitObject::Commit {..} => "commit",
             GitObject::Tree => "tree",
             GitObject::Tag => "tag",
             GitObject::Blob {..} => "blob",
@@ -34,7 +38,7 @@ impl GitObject {
     pub fn serialize(&self) -> Vec<u8> {
         let format = self.get_format();
         let mut data = match self {
-            GitObject::Commit => self.serialize_commit(),
+            GitObject::Commit { map } => self.serialize_commit(map),
             GitObject::Tree => self.serialize_tree(),
             GitObject::Tag => self.serialize_tag(),
             GitObject::Blob { data } => self.serialize_blob(data),
@@ -48,8 +52,8 @@ impl GitObject {
         data
     }
 
-    fn serialize_commit(&self) -> Vec<u8> {
-        Vec::new()
+    fn serialize_commit(&self, map: &ListOrderedMultimap<String, String>) -> Vec<u8> {
+        crate::kvlm::kvlm_serialize(&map).into_bytes()
     }
 
     fn serialize_tree(&self) -> Vec<u8> {
@@ -61,7 +65,7 @@ impl GitObject {
     }
 
     fn serialize_blob(&self, data: &Vec<u8>) -> Vec<u8> {
-        Vec::new()
+        data.clone()
     }
 
     pub fn deserialize(format: &str, data: Vec<u8>) -> Result<Self, Error> {
@@ -75,7 +79,15 @@ impl GitObject {
     }
 
     fn deserialize_commit(data: Vec<u8>) -> Result<Self, Error> {
-        Ok(GitObject::Commit)
+        let data = match String::from_utf8(data) {
+            Ok(data) => data,
+            Err(_) => return Err(Error::BadKVLMFormat),
+        };
+        let map = crate::kvlm::kvlm_parse(&data)?;
+
+        Ok(GitObject::Commit {
+            map,
+        })
     }
 
     fn deserialize_tree(data: Vec<u8>) -> Result<Self, Error> {
