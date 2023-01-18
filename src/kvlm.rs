@@ -85,3 +85,50 @@ where
         value_lines.join("\n"),
     ))
 }
+
+/// Serializes a ListOrderedMultimap into a "key value list with message."
+/// 
+/// The message should be stored under the blank key `""`. See [`kvlm_parse`] for detailed format specification.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use wyag::kvlm::kvlm_serialize;
+/// 
+/// let mut map = ordered_multimap::ListOrderedMultimap::<String, String>::new();
+/// map.insert("name".to_owned(), "Robin".to_owned());
+/// map.insert("address".to_owned(), "1234 Rager Ln.\nCorvallis, OR 97333".to_owned());
+/// map.append("languages".to_owned(), "English".to_owned());
+/// map.append("languages".to_owned(), "Rust".to_owned());
+/// map.insert("".to_owned(), "This is my message.\nIt has two lines.".to_owned());
+/// 
+/// let serialized = kvlm_serialize(&map);
+/// 
+/// assert_eq!(serialized, "\
+/// name Robin
+/// address 1234 Rager Ln.
+///  Corvallis, OR 97333
+/// languages English
+/// languages Rust
+///
+/// This is my message.
+/// It has two lines.");
+/// ```
+pub fn kvlm_serialize(kvlm: &ListOrderedMultimap<String, String>) -> String {
+    let header = kvlm.pairs()
+        .filter(|(key, _)| key.len() > 0)
+        .map(|(key, values)| {
+            values.map(|value| {
+                let value = value.replace('\n', "\n ");
+                format!("{key} {value}")
+            }).join("\n")
+        })
+        .join("\n");
+
+    let message = match kvlm.get("") {
+        Some(message) => &message[..],
+        None => "",
+    };
+
+    format!("{header}\n\n{message}")
+}
