@@ -194,7 +194,7 @@ pub fn object_read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject,
     };
 
     // Validate size
-    let data: Vec<u8> = iter.skip(1).collect();
+    let data: Vec<u8> = iter.collect();
     if data.len() != size {
         return Err(Error::InvalidObjectHeader(format!("Malformed object {}: incorrect length", hash.string)));
     }
