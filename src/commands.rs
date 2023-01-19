@@ -213,12 +213,26 @@ pub fn cmd_ls_files(_args: LsFilesArgs) -> Result<(), Error> {
     Ok(())
 }
 
+/// Pretty-print a tree object.
 #[derive(Args)]
 pub struct LsTreeArgs {
-    
+    /// The tree object to display.
+    object: String,
 }
 
-pub fn cmd_ls_tree(_args: LsTreeArgs) -> Result<(), Error> {
+pub fn cmd_ls_tree(args: LsTreeArgs) -> Result<(), Error> {
+    let repo = repo_find(".")?;
+    let hash = object_find(&repo, &args.object)?;
+    let tree = match object_read(&repo, &hash)? {
+        GitObject::Tree(tree) => tree,
+        _ => return Err(Error::ObjectNotTree),
+    };
+
+    for entry in &tree.entries {
+        let object = object_read(&repo, &entry.hash)?;
+        println!("{:0>6} {} {}\t{}", entry.mode, object.get_format(), entry.hash, entry.name);
+    }
+
     Ok(())
 }
 
