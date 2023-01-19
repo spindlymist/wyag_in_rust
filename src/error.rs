@@ -16,7 +16,9 @@ pub enum Error {
     InvalidObjectHash,
     UnrecognizedObjectFormat,
     NonCommitInGraph,
+    ObjectNotTree,
     BadKVLMFormat,
+    BadTreeFormat,
     Io(io::Error),
     Ini(ini::Error),
 }
