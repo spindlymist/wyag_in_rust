@@ -1,11 +1,10 @@
 use std::{
     path::{PathBuf},
     io::{Read, Write},
-    str, hash::Hash,
+    str,
+    fmt,
 };
 
-use ordered_multimap::ListOrderedMultimap;
-use sha1::{Sha1, Digest};
 use flate2::{read::ZlibDecoder, write::ZlibEncoder};
 
 use crate::{
@@ -13,139 +12,96 @@ use crate::{
     repo::{GitRepository, repo_open_file},
 };
 
-pub enum GitObject {
-    Commit {
-        // TODO replace with a better model, following tutorial for now
-        map: ListOrderedMultimap<String, String>,
-    },
-    Tree,
+mod blob;
+mod commit;
+mod hash;
+mod tag;
+mod tree;
+
+pub use blob::Blob;
+pub use commit::Commit;
+pub use hash::ObjectHash;
+pub use tag::Tag;
+pub use tree::Tree;
+
+#[derive(PartialEq, Eq)]
+pub enum ObjectFormat {
+    Blob,
+    Commit,
     Tag,
-    Blob {
-        data: Vec<u8>,
-    },
+    Tree,
 }
 
-impl GitObject {
-    pub fn get_format(&self) -> &'static str {
-        match self {
-            GitObject::Commit {..} => "commit",
-            GitObject::Tree => "tree",
-            GitObject::Tag => "tag",
-            GitObject::Blob {..} => "blob",
-        }
-    }
+impl fmt::Display for ObjectFormat {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use ObjectFormat::*;
 
-    pub fn serialize(&self) -> Vec<u8> {
-        match self {
-            GitObject::Commit { map } => self.serialize_commit(map),
-            GitObject::Tree => self.serialize_tree(),
-            GitObject::Tag => self.serialize_tag(),
-            GitObject::Blob { data } => self.serialize_blob(data),
-        }
-    }
-
-    fn serialize_commit(&self, map: &ListOrderedMultimap<String, String>) -> Vec<u8> {
-        crate::kvlm::kvlm_serialize(&map).into_bytes()
-    }
-
-    fn serialize_tree(&self) -> Vec<u8> {
-        Vec::new()
-    }
-
-    fn serialize_tag(&self) -> Vec<u8> {
-        Vec::new()
-    }
-
-    fn serialize_blob(&self, data: &Vec<u8>) -> Vec<u8> {
-        data.clone()
-    }
-
-    pub fn deserialize(format: &str, data: Vec<u8>) -> Result<Self, Error> {
-        match format {
-            "commit" => Self::deserialize_commit(data),
-            "tree" => Self::deserialize_tree(data),
-            "tag" => Self::deserialize_tag(data),
-            "blob" => Self::deserialize_blob(data),
-            _ => Err(Error::UnrecognizedObjectFormat),
-        }
-    }
-
-    fn deserialize_commit(data: Vec<u8>) -> Result<Self, Error> {
-        let data = match String::from_utf8(data) {
-            Ok(data) => data,
-            Err(_) => return Err(Error::BadKVLMFormat),
+        let format_name = match self {
+            Blob => "blob",
+            Commit => "commit",
+            Tag => "tag",
+            Tree => "tree",
         };
-        let map = crate::kvlm::kvlm_parse(&data)?;
 
-        Ok(GitObject::Commit {
-            map,
-        })
-    }
-
-    fn deserialize_tree(_data: Vec<u8>) -> Result<Self, Error> {
-        Ok(GitObject::Tree)
-    }
-
-    fn deserialize_tag(_data: Vec<u8>) -> Result<Self, Error> {
-        Ok(GitObject::Tag)
-    }
-
-    fn deserialize_blob(data: Vec<u8>) -> Result<Self, Error> {
-        Ok(GitObject::Blob {
-            data
-        })
+        write!(f, "{format_name}")
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, Copy, Hash)]
-pub struct ObjectHash {
-    pub raw: [u8; 20],
-}
-
-impl ObjectHash {
-    pub fn new(data: impl AsRef<[u8]>) -> ObjectHash {
-        let raw = Sha1::new()
-            .chain_update(data)
-            .finalize()
-            .as_slice()
-            .try_into()
-            .expect("Sha1 hash should always be 20 bytes");
-
-        ObjectHash { raw }
-    }
-
-    fn to_path(&self) -> PathBuf {
-        let string_hash = self.to_string();
-        let directory = &string_hash[..2];
-        let file = &string_hash[2..];
-
-        [directory, file].iter().collect()
-    }
-}
-
-impl std::fmt::Display for ObjectHash {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string_hash = base16ct::lower::encode_string(&self.raw);
-        write!(f, "{}", string_hash)
-    }
-}
-
-impl TryFrom<&str> for ObjectHash {
+impl TryFrom<&str> for ObjectFormat {
     type Error = Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let mut raw = [0u8; 20];
+        use ObjectFormat::*;
 
-        match base16ct::mixed::decode(value, &mut raw) {
-            Ok(raw) => {
-                if raw.len() != 20 {
-                    return Err(Error::InvalidObjectHash);
-                }
-            },
-            Err(_) => return Err(Error::InvalidObjectHash),
-        };
+        match value {
+            "blob" => Ok(Blob),
+            "commit" => Ok(Commit),
+            "tag" => Ok(Tag),
+            "tree" => Ok(Tree),
+            _ => Err(Error::UnrecognizedObjectFormat),
+        }
+    }
+}
 
-        Ok(ObjectHash { raw })
+pub enum GitObject {
+    Blob(Blob),
+    Commit(Commit),
+    Tag(Tag),
+    Tree(Tree),
+}
+
+impl GitObject {
+    pub fn get_format(&self) -> ObjectFormat {
+        match self {
+            GitObject::Blob(_) => ObjectFormat::Blob,
+            GitObject::Commit(_) => ObjectFormat::Commit,
+            GitObject::Tag(_) => ObjectFormat::Tag,
+            GitObject::Tree(_) => ObjectFormat::Tree,
+        }
+    }
+    pub fn serialize(&self) -> Vec<u8> {
+        match self {
+            GitObject::Blob(inner) => inner.serialize(),
+            GitObject::Commit(inner) => inner.serialize(),
+            GitObject::Tag(inner) => inner.serialize(),
+            GitObject::Tree(inner) => inner.serialize(),
+        }
+    }
+    pub fn serialize_into(self) -> Vec<u8> {
+        match self {
+            GitObject::Blob(inner) => inner.serialize_into(),
+            GitObject::Commit(inner) => inner.serialize_into(),
+            GitObject::Tag(inner) => inner.serialize_into(),
+            GitObject::Tree(inner) => inner.serialize_into(),
+        }
+    }
+    pub fn deserialize(format: ObjectFormat, data: Vec<u8>) -> Result<GitObject, Error> {
+        Ok(match format {
+            ObjectFormat::Blob => GitObject::Blob(Blob::deserialize(data)?),
+            ObjectFormat::Commit => GitObject::Commit(Commit::deserialize(data)?),
+            ObjectFormat::Tag => GitObject::Tag(Tag::deserialize(data)?),
+            ObjectFormat::Tree => GitObject::Tree(Tree::deserialize(data)?),
+        })
     }
 }
 
@@ -183,7 +139,7 @@ pub fn object_read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject,
     };
 
     let (format, size) = match header.split_once(' ') {
-        Some((left, right)) => (left, right),
+        Some((left, right)) => (ObjectFormat::try_from(left)?, right),
         None => return Err(Error::InvalidObjectHeader(format!("Malformed object {}: not enough parts", hash))),
     };
 
@@ -198,7 +154,7 @@ pub fn object_read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject,
         return Err(Error::InvalidObjectHeader(format!("Malformed object {}: incorrect length", hash)));
     }
 
-    GitObject::deserialize(format, data)
+    Ok(GitObject::deserialize(format, data)?)
 }
 
 const COMPRESSION_LEVEL: u32 = 6;

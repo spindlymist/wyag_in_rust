@@ -8,7 +8,14 @@ use clap::{Parser, Subcommand, Args};
 use crate::{
     error::Error,
     repo::{GitRepository, repo_find},
-    object::{GitObject, ObjectHash, object_read, object_write, object_find},
+    object::{
+        GitObject,
+        ObjectHash,
+        ObjectFormat,
+        object_read,
+        object_write,
+        object_find,
+    },
 };
 
 #[derive(Parser)]
@@ -37,6 +44,27 @@ pub enum Commands {
    Tag(TagArgs),
 }
 
+#[derive(clap::ValueEnum, Clone)]
+enum ClapObjectFormat {
+    Commit,
+    Tree,
+    Tag,
+    Blob,
+}
+
+impl Into<ObjectFormat> for ClapObjectFormat {
+    fn into(self) -> ObjectFormat {
+        use ClapObjectFormat::*;
+
+        match self {
+            Commit => ObjectFormat::Commit,
+            Tree => ObjectFormat::Tree,
+            Tag => ObjectFormat::Tag,
+            Blob => ObjectFormat::Blob,
+        }
+    }
+}
+
 #[derive(Args)]
 pub struct AddArgs {
 
@@ -46,20 +74,12 @@ pub fn cmd_add(_args: AddArgs) -> Result<(), Error> {
     Ok(())
 }
 
-#[derive(clap::ValueEnum, Clone)]
-enum ObjectFormat {
-    Commit,
-    Tree,
-    Tag,
-    Blob,
-}
-
 /// Displays contents of repository object
 #[derive(Args)]
 pub struct CatFileArgs {
     /// The type of object to display
     #[arg(id = "TYPE")]
-    object_type: ObjectFormat,
+    object_type: ClapObjectFormat,
 
     /// The object to display
     object: String,
@@ -101,8 +121,8 @@ pub struct HashObjectArgs {
     write: bool,
 
     /// The type of the object
-    #[arg(id = "type", short, long)]
-    format: Option<ObjectFormat>,
+    #[arg(id = "type", short, long, default_value = "blob")]
+    format: ClapObjectFormat,
 
     /// Path to read the object from
     path: PathBuf,
@@ -110,14 +130,8 @@ pub struct HashObjectArgs {
 
 pub fn cmd_hash_object(args: HashObjectArgs) -> Result<(), Error> {
     // TODO move some of this logic to object module?
-    let format = match args.format.unwrap_or(ObjectFormat::Blob) {
-        ObjectFormat::Commit => "commit",
-        ObjectFormat::Tree => "tree",
-        ObjectFormat::Tag => "tag",
-        ObjectFormat::Blob {..} => "blob",
-    };
     let data = std::fs::read_to_string(args.path)?.into_bytes();
-    let object = GitObject::deserialize(format, data)?;
+    let object = GitObject::deserialize(args.format.into(), data)?;
     let hash;
 
     if args.write {
@@ -176,8 +190,8 @@ fn log_graphviz<'a>(repo: &GitRepository, hash: &'a ObjectHash, seen: &mut HashS
 
     let commit = object_read(&repo, &hash)?;
 
-    if let GitObject::Commit { map } = commit {
-        for parent in map.get_all("parent") {
+    if let GitObject::Commit(commit) = commit {
+        for parent in commit.map.get_all("parent") {
             let parent_hash = ObjectHash::try_from(&parent[..])?;
             println!("c_{} -> c_{}", hash, parent_hash);
             log_graphviz(&repo, &parent_hash, seen)?;
@@ -186,7 +200,7 @@ fn log_graphviz<'a>(repo: &GitRepository, hash: &'a ObjectHash, seen: &mut HashS
         Ok(())
     }
     else {
-        Err(Error::CommitParentWrongFormat)
+        Err(Error::NonCommitInGraph)
     }
 }
 

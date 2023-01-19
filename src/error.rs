@@ -15,7 +15,7 @@ pub enum Error {
     InvalidObjectHeader(String),
     InvalidObjectHash,
     UnrecognizedObjectFormat,
-    CommitParentWrongFormat,
+    NonCommitInGraph,
     BadKVLMFormat,
     Io(io::Error),
     Ini(ini::Error),
