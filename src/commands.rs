@@ -168,18 +168,18 @@ pub fn cmd_log(args: LogArgs) -> Result<(), Error> {
     Ok(())
 }
 
-fn log_graphviz<'a>(repo: &GitRepository, hash: &'a ObjectHash, seen: &mut HashSet<[u8; 20]>) -> Result<(), Error> {
-    if seen.contains(&hash.raw) {
+fn log_graphviz<'a>(repo: &GitRepository, hash: &'a ObjectHash, seen: &mut HashSet<ObjectHash>) -> Result<(), Error> {
+    if seen.contains(hash) {
         return Ok(());
     }
-    seen.insert(hash.raw);
+    seen.insert(*hash);
 
     let commit = object_read(&repo, &hash)?;
 
     if let GitObject::Commit { map } = commit {
         for parent in map.get_all("parent") {
             let parent_hash = ObjectHash::try_from(&parent[..])?;
-            println!("c_{} -> c_{}", hash.string, parent_hash.string);
+            println!("c_{} -> c_{}", hash, parent_hash);
             log_graphviz(&repo, &parent_hash, seen)?;
         }
 

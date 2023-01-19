@@ -1,7 +1,7 @@
 use std::{
     path::{PathBuf},
     io::{Read, Write},
-    str,
+    str, hash::Hash,
 };
 
 use ordered_multimap::ListOrderedMultimap;
@@ -97,11 +97,9 @@ impl GitObject {
     }
 }
 
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Hash)]
 pub struct ObjectHash {
-    #[allow(dead_code)]
     pub raw: [u8; 20],
-    pub string: String,
-    pub path: PathBuf,
 }
 
 impl ObjectHash {
@@ -112,17 +110,12 @@ impl ObjectHash {
             .as_slice()
             .try_into()
             .expect("Sha1 hash should always be 20 bytes");
-        let string = Self::make_string(&raw);
-        let path = Self::make_path(&string);
 
-        ObjectHash { raw, string, path, }
+        ObjectHash { raw }
     }
 
-    fn make_string(raw_hash: &[u8; 20]) -> String {
-        base16ct::lower::encode_string(raw_hash)
-    }
-
-    fn make_path(string_hash: &str) -> PathBuf {
+    fn to_path(&self) -> PathBuf {
+        let string_hash = self.to_string();
         let directory = &string_hash[..2];
         let file = &string_hash[2..];
 
@@ -132,7 +125,8 @@ impl ObjectHash {
 
 impl std::fmt::Display for ObjectHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.string)
+        let string_hash = base16ct::lower::encode_string(&self.raw);
+        write!(f, "{}", string_hash)
     }
 }
 
@@ -141,6 +135,7 @@ impl TryFrom<&str> for ObjectHash {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mut raw = [0u8; 20];
+
         match base16ct::mixed::decode(value, &mut raw) {
             Ok(raw) => {
                 if raw.len() != 20 {
@@ -150,9 +145,7 @@ impl TryFrom<&str> for ObjectHash {
             Err(_) => return Err(Error::InvalidObjectHash),
         };
 
-        let path = Self::make_path(&value);
-
-        Ok(ObjectHash { raw, string: String::from(value), path, })
+        Ok(ObjectHash { raw })
     }
 }
 
@@ -168,7 +161,7 @@ pub fn object_read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject,
 
     // Read and decompress
     {
-        let path = PathBuf::from("objects").join(&hash.path);
+        let path = PathBuf::from("objects").join(hash.to_path());
         let object_file = repo_open_file(&repo, path, None)?;
         let mut decoder = ZlibDecoder::new(object_file);
         decoder.read_to_end(&mut buf)?;
@@ -186,23 +179,23 @@ pub fn object_read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject,
 
     let header = match str::from_utf8(&header) {
         Ok(val) => val,
-        Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {}: couldn't parse header", hash.string))),
+        Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {}: couldn't parse header", hash))),
     };
 
     let (format, size) = match header.split_once(' ') {
         Some((left, right)) => (left, right),
-        None => return Err(Error::InvalidObjectHeader(format!("Malformed object {}: not enough parts", hash.string))),
+        None => return Err(Error::InvalidObjectHeader(format!("Malformed object {}: not enough parts", hash))),
     };
 
     let size = match usize::from_str_radix(size, 10) {
         Ok(val) => val,
-        Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {}: invalid length", hash.string))),
+        Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {}: invalid length", hash))),
     };
 
     // Validate size
     let data: Vec<u8> = iter.collect();
     if data.len() != size {
-        return Err(Error::InvalidObjectHeader(format!("Malformed object {}: incorrect length", hash.string)));
+        return Err(Error::InvalidObjectHeader(format!("Malformed object {}: incorrect length", hash)));
     }
 
     GitObject::deserialize(format, data)
@@ -222,7 +215,7 @@ pub fn object_write(repo: &GitRepository, object: &GitObject) -> Result<ObjectHa
         .create(true)
         .write(true)
         .truncate(true);
-    let path = PathBuf::from("objects").join(&hash.path);
+    let path = PathBuf::from("objects").join(hash.to_path());
     let object_file = repo_open_file(&repo, path, Some(&options))?;
 
     let mut encoder = ZlibEncoder::new(object_file, flate2::Compression::new(COMPRESSION_LEVEL));
