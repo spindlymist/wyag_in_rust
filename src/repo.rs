@@ -4,6 +4,7 @@ use std::{
     io::{Write},
 };
 use ini::Ini;
+use path_absolutize::Absolutize;
 
 use crate::{
     error::Error,
@@ -21,7 +22,8 @@ impl GitRepository {
     where
         P: AsRef<Path>
     {
-        let working_dir = dir.as_ref().canonicalize()?;
+        let working_dir = dir.as_ref().absolutize()?.to_path_buf();
+
         if working_dir.is_file() {
             return Err(Error::InitPathIsFile);
         }
@@ -33,9 +35,9 @@ impl GitRepository {
                     }
                 },
                 Err(err) => return Err(err.into()),
-            }
+            };
         }
-
+        
         let git_dir = working_dir.join(".git");
         fs::create_dir_all(&git_dir)?;
 
@@ -44,7 +46,7 @@ impl GitRepository {
             .set("repositoryformatversion", "0")
             .set("filemode", "false")
             .set("bare", "false");
-            
+
         let repo = GitRepository {
             working_dir,
             git_dir,
@@ -104,40 +106,42 @@ impl GitRepository {
     }
 }
 
-pub fn repo_path<P>(repo: &GitRepository, path: P) -> PathBuf
+pub fn repo_path<P>(repo: &GitRepository, rel_path: P) -> PathBuf
 where
     P: AsRef<Path>
 {
-    repo.git_dir.join(path)
+    repo.git_dir.join(rel_path)
 }
 
-pub fn repo_open_file<P>(repo: &GitRepository, path: P, options: Option<&OpenOptions>) -> Result<File, Error>
+pub fn repo_open_file<P>(repo: &GitRepository, rel_path: P, options: Option<&OpenOptions>) -> Result<File, Error>
 where
     P: AsRef<Path>
-{
-    if let Some(parent_path) = path.as_ref().parent() {
+{    
+    if let Some(parent_path) = rel_path.as_ref().parent() {
         repo_make_dir(repo, parent_path)?;
     }
+    
+    let abs_path = repo_path(&repo, rel_path);
 
     if let Some(options) = options {
-        Ok(options.open(path)?)
+        Ok(options.open(abs_path)?)
     }
     else {
-        Ok(File::open(path)?)
+        Ok(File::open(abs_path)?)
     }
 }
 
-pub fn repo_make_dir<P>(repo: &GitRepository, path: P) -> Result<PathBuf, Error>
+pub fn repo_make_dir<P>(repo: &GitRepository, rel_path: P) -> Result<PathBuf, Error>
 where
     P: AsRef<Path>
 {
-    let path = repo_path(&repo, path.as_ref());
+    let abs_path = repo_path(&repo, rel_path);
 
-    if !path.is_dir() {
-        fs::create_dir_all(&path)?;
+    if !abs_path.is_dir() {
+        fs::create_dir_all(&abs_path)?;
     }
     
-    Ok(path)
+    Ok(abs_path)
 }
 
 /// Finds the git repository that contains `path` (if it exists).
