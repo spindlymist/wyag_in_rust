@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use std::{
-    path::PathBuf,
+    path::PathBuf, collections::HashSet,
 };
 use clap::{Parser, Subcommand, Args};
 
@@ -67,7 +67,7 @@ pub struct CatFileArgs {
 
 pub fn cmd_cat_file(args: CatFileArgs) -> Result<(), Error> {
     let repo = repo_find(".")?;
-    let hash = object_find(&repo, args.object)?;
+    let hash = object_find(&repo, &args.object)?;
     let object = object_read(&repo, &hash)?;
 
     println!("{}", String::from_utf8_lossy(&object.serialize()));
@@ -149,13 +149,45 @@ pub fn cmd_init(args: InitArgs) -> Result<(), Error> {
     Ok(())
 }
 
+/// Display history of a given commit.
 #[derive(Args)]
 pub struct LogArgs {
-    
+    /// The commit to start at.
+    #[arg(default_value = "HEAD")]
+    commit: String,
 }
 
-pub fn cmd_log(_args: LogArgs) -> Result<(), Error> {
+pub fn cmd_log(args: LogArgs) -> Result<(), Error> {
+    let repo = repo_find(".")?;
+
+    println!("digraph wyaglog{{");
+    let hash = object_find(&repo, &args.commit)?;
+    log_graphviz(&repo, &hash, &mut HashSet::new())?;
+    println!("}}");
+
     Ok(())
+}
+
+fn log_graphviz<'a>(repo: &GitRepository, hash: &'a ObjectHash, seen: &mut HashSet<[u8; 20]>) -> Result<(), Error> {
+    if seen.contains(&hash.raw) {
+        return Ok(());
+    }
+    seen.insert(hash.raw);
+
+    let commit = object_read(&repo, &hash)?;
+
+    if let GitObject::Commit { map } = commit {
+        for parent in map.get_all("parent") {
+            let parent_hash = ObjectHash::try_from(&parent[..])?;
+            println!("c_{} -> c_{}", hash.string, parent_hash.string);
+            log_graphviz(&repo, &parent_hash, seen)?;
+        }
+
+        Ok(())
+    }
+    else {
+        Err(Error::CommitParentWrongFormat)
+    }
 }
 
 #[derive(Args)]

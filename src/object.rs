@@ -36,20 +36,12 @@ impl GitObject {
     }
 
     pub fn serialize(&self) -> Vec<u8> {
-        let format = self.get_format();
-        let mut data = match self {
+        match self {
             GitObject::Commit { map } => self.serialize_commit(map),
             GitObject::Tree => self.serialize_tree(),
             GitObject::Tag => self.serialize_tag(),
             GitObject::Blob { data } => self.serialize_blob(data),
-        };
-        
-        let size = data.len();
-
-        let header = format!("{format} {size}\0").into_bytes().into_iter();
-        data.splice(0..0, header);
-
-        data
+        }
     }
 
     fn serialize_commit(&self, map: &ListOrderedMultimap<String, String>) -> Vec<u8> {
@@ -107,9 +99,9 @@ impl GitObject {
 
 pub struct ObjectHash {
     #[allow(dead_code)]
-    raw: [u8; 20],
-    string: String,
-    path: PathBuf,
+    pub raw: [u8; 20],
+    pub string: String,
+    pub path: PathBuf,
 }
 
 impl ObjectHash {
@@ -144,12 +136,12 @@ impl std::fmt::Display for ObjectHash {
     }
 }
 
-impl TryFrom<String> for ObjectHash {
+impl TryFrom<&str> for ObjectHash {
     type Error = Error;
 
-    fn try_from(value: String) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mut raw = [0u8; 20];
-        match base16ct::mixed::decode(&value, &mut raw) {
+        match base16ct::mixed::decode(value, &mut raw) {
             Ok(raw) => {
                 if raw.len() != 20 {
                     return Err(Error::InvalidObjectHash);
@@ -160,12 +152,12 @@ impl TryFrom<String> for ObjectHash {
 
         let path = Self::make_path(&value);
 
-        Ok(ObjectHash { raw, string: value, path, })
+        Ok(ObjectHash { raw, string: String::from(value), path, })
     }
 }
 
 /// Finds the object in `repo` identified by `id`.
-pub fn object_find(_repo: &GitRepository, id: String) -> Result<ObjectHash, Error> {
+pub fn object_find(_repo: &GitRepository, id: &str) -> Result<ObjectHash, Error> {
     // For now, just try to parse id as an object hash
     ObjectHash::try_from(id)
 }
@@ -220,6 +212,9 @@ const COMPRESSION_LEVEL: u32 = 6;
 
 pub fn object_write(repo: &GitRepository, object: &GitObject) -> Result<ObjectHash, Error> {
     let data = object.serialize();
+    let format = object.get_format();
+    let size = data.len();
+    let header = format!("{format} {size}\0").into_bytes();
     let hash = ObjectHash::new(&data);
 
     let mut options = std::fs::OpenOptions::new();
@@ -231,6 +226,7 @@ pub fn object_write(repo: &GitRepository, object: &GitObject) -> Result<ObjectHa
     let object_file = repo_open_file(&repo, path, Some(&options))?;
 
     let mut encoder = ZlibEncoder::new(object_file, flate2::Compression::new(COMPRESSION_LEVEL));
+    encoder.write_all(&header)?;
     encoder.write_all(&data)?;
 
     Ok(hash)
