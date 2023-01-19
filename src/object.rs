@@ -127,7 +127,7 @@ impl ObjectHash {
     }
 
     fn make_string(raw_hash: &[u8; 20]) -> String {
-        base16ct::upper::encode_string(raw_hash)
+        base16ct::lower::encode_string(raw_hash)
     }
 
     fn make_path(string_hash: &str) -> PathBuf {
@@ -176,7 +176,8 @@ pub fn object_read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject,
 
     // Read and decompress
     {
-        let object_file = repo_open_file(&repo, &hash.path, None)?;
+        let path = PathBuf::from("objects").join(&hash.path);
+        let object_file = repo_open_file(&repo, path, None)?;
         let mut decoder = ZlibDecoder::new(object_file);
         decoder.read_to_end(&mut buf)?;
     }
@@ -226,7 +227,8 @@ pub fn object_write(repo: &GitRepository, object: &GitObject) -> Result<ObjectHa
         .create(true)
         .write(true)
         .truncate(true);
-    let object_file = repo_open_file(&repo, &hash.path, Some(&options))?;
+    let path = PathBuf::from("objects").join(&hash.path);
+    let object_file = repo_open_file(&repo, path, Some(&options))?;
 
     let mut encoder = ZlibEncoder::new(object_file, flate2::Compression::new(COMPRESSION_LEVEL));
     encoder.write_all(&data)?;
