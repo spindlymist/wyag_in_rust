@@ -42,7 +42,7 @@ pub struct AddArgs {
 
 }
 
-pub fn cmd_add(args: AddArgs) -> Result<(), Error> {
+pub fn cmd_add(_args: AddArgs) -> Result<(), Error> {
     Ok(())
 }
 
@@ -80,7 +80,7 @@ pub struct CheckoutArgs {
     
 }
 
-pub fn cmd_checkout(args: CheckoutArgs) -> Result<(), Error> {
+pub fn cmd_checkout(_args: CheckoutArgs) -> Result<(), Error> {
     Ok(())
 }
 
@@ -89,7 +89,7 @@ pub struct CommitArgs {
     
 }
 
-pub fn cmd_commit(args: CommitArgs) -> Result<(), Error> {
+pub fn cmd_commit(_args: CommitArgs) -> Result<(), Error> {
     Ok(())
 }
 
@@ -154,7 +154,7 @@ pub struct LogArgs {
     
 }
 
-pub fn cmd_log(args: LogArgs) -> Result<(), Error> {
+pub fn cmd_log(_args: LogArgs) -> Result<(), Error> {
     Ok(())
 }
 
@@ -163,7 +163,7 @@ pub struct LsFilesArgs {
     
 }
 
-pub fn cmd_ls_files(args: LsFilesArgs) -> Result<(), Error> {
+pub fn cmd_ls_files(_args: LsFilesArgs) -> Result<(), Error> {
     Ok(())
 }
 
@@ -172,7 +172,7 @@ pub struct LsTreeArgs {
     
 }
 
-pub fn cmd_ls_tree(args: LsTreeArgs) -> Result<(), Error> {
+pub fn cmd_ls_tree(_args: LsTreeArgs) -> Result<(), Error> {
     Ok(())
 }
 
@@ -182,7 +182,7 @@ pub struct MergeArgs {
     
 }
 
-pub fn cmd_merge(args: MergeArgs) -> Result<(), Error> {
+pub fn cmd_merge(_args: MergeArgs) -> Result<(), Error> {
     Ok(())
 }
 
@@ -192,7 +192,7 @@ pub struct RebaseArgs {
     
 }
 
-pub fn cmd_rebase(args: RebaseArgs) -> Result<(), Error> {
+pub fn cmd_rebase(_args: RebaseArgs) -> Result<(), Error> {
     Ok(())
 }
 
@@ -201,7 +201,7 @@ pub struct RevParseArgs {
     
 }
 
-pub fn cmd_rev_parse(args: RevParseArgs) -> Result<(), Error> {
+pub fn cmd_rev_parse(_args: RevParseArgs) -> Result<(), Error> {
     Ok(())
 }
 
@@ -210,7 +210,7 @@ pub struct RmArgs {
     
 }
 
-pub fn cmd_rm(args: RmArgs) -> Result<(), Error> {
+pub fn cmd_rm(_args: RmArgs) -> Result<(), Error> {
     Ok(())
 }
 
@@ -219,7 +219,7 @@ pub struct ShowRefArgs {
     
 }
 
-pub fn cmd_show_ref(args: ShowRefArgs) -> Result<(), Error> {
+pub fn cmd_show_ref(_args: ShowRefArgs) -> Result<(), Error> {
     Ok(())
 }
 
@@ -228,6 +228,6 @@ pub struct TagArgs {
     
 }
 
-pub fn cmd_tag(args: TagArgs) -> Result<(), Error> {
+pub fn cmd_tag(_args: TagArgs) -> Result<(), Error> {
     Ok(())
 }

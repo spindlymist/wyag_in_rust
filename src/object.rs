@@ -90,11 +90,11 @@ impl GitObject {
         })
     }
 
-    fn deserialize_tree(data: Vec<u8>) -> Result<Self, Error> {
+    fn deserialize_tree(_data: Vec<u8>) -> Result<Self, Error> {
         Ok(GitObject::Tree)
     }
 
-    fn deserialize_tag(data: Vec<u8>) -> Result<Self, Error> {
+    fn deserialize_tag(_data: Vec<u8>) -> Result<Self, Error> {
         Ok(GitObject::Tag)
     }
 
@@ -106,6 +106,7 @@ impl GitObject {
 }
 
 pub struct ObjectHash {
+    #[allow(dead_code)]
     raw: [u8; 20],
     string: String,
     path: PathBuf,
@@ -164,7 +165,7 @@ impl TryFrom<String> for ObjectHash {
 }
 
 /// Finds the object in `repo` identified by `id`.
-pub fn object_find(repo: &GitRepository, id: String) -> Result<ObjectHash, Error> {
+pub fn object_find(_repo: &GitRepository, id: String) -> Result<ObjectHash, Error> {
     // For now, just try to parse id as an object hash
     ObjectHash::try_from(id)
 }

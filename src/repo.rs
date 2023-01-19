@@ -10,6 +10,7 @@ use crate::{
 };
 
 pub struct GitRepository {
+    #[allow(dead_code)]
     working_dir: PathBuf,
     git_dir: PathBuf,
     config: Ini,
