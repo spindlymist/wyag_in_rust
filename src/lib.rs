@@ -7,6 +7,7 @@ pub use error::Error;
 
 pub mod repo;
 pub mod object;
+pub mod refs;
 pub mod kvlm;
 
 pub fn run(cli: Cli) {
