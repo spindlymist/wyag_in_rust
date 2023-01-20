@@ -1,13 +1,29 @@
 use std::{
     fs,
+    io::{Write},
     path::{Path, PathBuf},
 };
 
 use crate::{
     error::Error,
-    repo::{GitRepository, repo_path},
+    repo::{GitRepository, repo_path, repo_open_file},
     object::ObjectHash,
 };
+
+pub fn ref_create<P>(repo: &GitRepository, ref_name: P, ref_hash: &ObjectHash) -> Result<(), Error>
+where
+    P: AsRef<Path>
+{
+    let mut options = fs::OpenOptions::new();
+    options
+        .create(true)
+        .write(true)
+        .truncate(true);
+    let mut ref_file = repo_open_file(&repo, PathBuf::from("refs").join(ref_name), Some(&options))?;
+    write!(ref_file, "{ref_hash}\n")?;
+
+    Ok(())
+}
 
 pub fn ref_resolve<P>(repo: &GitRepository, ref_path: P) -> Result<ObjectHash, Error>
 where
