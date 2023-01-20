@@ -19,6 +19,7 @@ pub enum Error {
     ObjectNotTree,
     BadKVLMFormat,
     BadTreeFormat,
+    BadCommitFormat,
     Io(io::Error),
     Ini(ini::Error),
 }

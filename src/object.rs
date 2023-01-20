@@ -22,7 +22,7 @@ pub use blob::Blob;
 pub use commit::Commit;
 pub use hash::ObjectHash;
 pub use tag::Tag;
-pub use tree::Tree;
+pub use tree::{Tree, tree_checkout};
 
 #[derive(PartialEq, Eq)]
 pub enum ObjectFormat {

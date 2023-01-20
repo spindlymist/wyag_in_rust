@@ -14,7 +14,7 @@ use crate::{
         ObjectFormat,
         object_read,
         object_write,
-        object_find,
+        object_find, tree_checkout,
     },
 };
 
@@ -95,13 +95,46 @@ pub fn cmd_cat_file(args: CatFileArgs) -> Result<(), Error> {
     Ok(())
 }
 
+/// Checkout a commit inside of a directory.
 #[derive(Args)]
 pub struct CheckoutArgs {
-    
+    /// The commit or tree to checkout.
+    commit: String,
+    /// The EMPTY directory to checkout on.
+    path: PathBuf,
 }
 
-pub fn cmd_checkout(_args: CheckoutArgs) -> Result<(), Error> {
-    Ok(())
+pub fn cmd_checkout(args: CheckoutArgs) -> Result<(), Error> {
+    let repo = repo_find(".")?;
+    let hash = object_find(&repo, &args.commit)?;
+    let mut object = object_read(&repo, &hash)?;
+    
+    if let GitObject::Commit(commit) = object {
+        let tree_hash = match commit.map.get("tree") {
+            Some(val) => ObjectHash::try_from(&val[..])?,
+            None => return Err(Error::BadCommitFormat),
+        };
+        object = object_read(&repo, &tree_hash)?;
+    }
+    
+    if let GitObject::Tree(tree) = object {
+        if args.path.is_file() {
+            return Err(Error::InitPathIsFile);
+        }
+        else if args.path.is_dir()
+             && args.path.read_dir()?.next().is_some()
+        {
+            return Err(Error::InitDirectoryNotEmpty);
+        }
+        else {
+            std::fs::create_dir(&args.path)?;
+        }
+
+        tree_checkout(&repo, &tree, args.path)
+    }
+    else {
+        Err(Error::ObjectNotTree)
+    }
 }
 
 #[derive(Args)]

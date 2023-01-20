@@ -1,5 +1,7 @@
-use crate::error::Error;
-use super::ObjectHash;
+use std::path::Path;
+
+use crate::{error::Error, repo::GitRepository};
+use super::{ObjectHash, object_read, GitObject};
 
 pub struct Tree {
     pub entries: Vec<TreeEntry>,
@@ -65,4 +67,26 @@ impl Tree {
     pub fn serialize_into(self) -> Vec<u8> {
         self.serialize()
     }
+}
+
+pub fn tree_checkout<P>(repo: &GitRepository, tree: &Tree, path: P) -> Result<(), Error>
+where
+    P: AsRef<Path>
+{
+    for entry in &tree.entries {
+        let object_path = path.as_ref().join(&entry.name);
+
+        match object_read(&repo, &entry.hash)? {
+            GitObject::Blob(blob) => {
+                std::fs::write(object_path, blob.serialize_into())?;
+            },
+            GitObject::Tree(tree) => {
+                std::fs::create_dir(&object_path)?;
+                tree_checkout(&repo, &tree, object_path)?;
+            },
+            _ => return Err(Error::BadTreeFormat),
+        };
+    }
+
+    Ok(())
 }
