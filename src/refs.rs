@@ -42,7 +42,7 @@ where
     }
 }
 
-pub fn ref_list(repo: &GitRepository) -> Result<Vec<(PathBuf, ObjectHash)>, Error> {
+pub fn ref_list(repo: &GitRepository) -> Result<Vec<(String, ObjectHash)>, Error> {
     let prev_working_dir = std::env::current_dir()?;
     std::env::set_current_dir(repo_path(&repo, "."))?;
 
@@ -54,7 +54,7 @@ pub fn ref_list(repo: &GitRepository) -> Result<Vec<(PathBuf, ObjectHash)>, Erro
     Ok(refs)
 }
 
-fn ref_list_recursive<P>(repo: &GitRepository, rel_path: P, refs: &mut Vec<(PathBuf, ObjectHash)>) -> Result<(), Error>
+fn ref_list_recursive<P>(repo: &GitRepository, rel_path: P, refs: &mut Vec<(String, ObjectHash)>) -> Result<(), Error>
 where
     P: AsRef<Path>
 {
@@ -67,7 +67,7 @@ where
         else {
             let ref_hash = ref_resolve(&repo, &path)?;
             refs.push((
-                path,
+                path.to_string_lossy().replace("\\", "/"),
                 ref_hash,
             ));
         }

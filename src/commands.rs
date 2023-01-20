@@ -14,7 +14,10 @@ use crate::{
         ObjectFormat,
         object_read,
         object_write,
-        object_find, tree_checkout,
+        object_find,
+        tree_checkout,
+        tag_create,
+        tag_create_lightweight,
     }, refs::ref_list,
 };
 
@@ -317,18 +320,51 @@ pub fn cmd_show_ref(_args: ShowRefArgs) -> Result<(), Error> {
     let repo = repo_find(".")?;
     let refs = ref_list(&repo)?;
 
-    for (ref_path, ref_hash) in refs {
-        println!("{} {}", ref_hash, ref_path.to_string_lossy());
+    for (name, hash) in refs {
+        println!("{hash} {name}");
     }
 
     Ok(())
 }
 
+/// List or create tags.
 #[derive(Args)]
 pub struct TagArgs {
-    
+    /// Create an annotated tag.
+    #[arg(short, long)]
+    annotate: bool,
+
+    /// The new tag's name.
+    name: Option<String>,
+
+    /// The object the new tag will point to.
+    #[arg(default_value = "HEAD")]
+    object: String,
 }
 
-pub fn cmd_tag(_args: TagArgs) -> Result<(), Error> {
+pub fn cmd_tag(args: TagArgs) -> Result<(), Error> {
+    if let Some(name) = args.name {
+        let repo = repo_find(".")?;
+        let hash = object_find(&repo, &args.object)?;
+
+        if args.annotate {
+            tag_create(&repo, &name, &hash)?;
+        }
+        else {
+            tag_create_lightweight(&repo, &name, &hash)?;
+        }
+    }
+    else {
+        let repo = repo_find(".")?;
+        let refs = ref_list(&repo)?;
+        let tag_names = refs.iter()
+            .filter(|(name, _)| name.starts_with("refs/tags/"))
+            .map(|(name, _)| &name["refs/tags/".len()..]);
+
+        for tag_name in tag_names {
+            println!("{tag_name}");
+        }
+    }
+
     Ok(())
 }
