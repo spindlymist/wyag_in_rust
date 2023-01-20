@@ -15,7 +15,7 @@ use crate::{
         object_read,
         object_write,
         object_find, tree_checkout,
-    },
+    }, refs::ref_list,
 };
 
 #[derive(Parser)]
@@ -307,12 +307,20 @@ pub fn cmd_rm(_args: RmArgs) -> Result<(), Error> {
     Ok(())
 }
 
+/// List references.
 #[derive(Args)]
 pub struct ShowRefArgs {
-    
+    // empty
 }
 
 pub fn cmd_show_ref(_args: ShowRefArgs) -> Result<(), Error> {
+    let repo = repo_find(".")?;
+    let refs = ref_list(&repo)?;
+
+    for (ref_path, ref_hash) in refs {
+        println!("{} {}", ref_hash, ref_path.to_string_lossy());
+    }
+
     Ok(())
 }
 
