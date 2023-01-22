@@ -292,12 +292,35 @@ pub fn cmd_rebase(_args: RebaseArgs) -> Result<(), Error> {
     Ok(())
 }
 
+/// Determines which object hash a name refers to (if any).
 #[derive(Args)]
 pub struct RevParseArgs {
-    
+    /// The name to parse.
+    name: String,
 }
 
-pub fn cmd_rev_parse(_args: RevParseArgs) -> Result<(), Error> {
+pub fn cmd_rev_parse(args: RevParseArgs) -> Result<(), Error> {
+    let repo = repo_find(".")?;
+    let hashes = match object_find(&repo, &args.name) {
+        Ok(hash) => vec![hash],
+        Err(err) => match err {
+            Error::BadObjectId => vec![],
+            Error::AmbiguousObjectId(candidates) => candidates,
+            _ => return Err(err),
+        },
+    };
+
+    match hashes.len() {
+        0 => println!(""),
+        1 => println!("{}", hashes[0]),
+        n => {
+            println!("{} is ambiguous: {n} matches", args.name);
+            for hash in hashes {
+                println!("{hash}");
+            }
+        }
+    };
+
     Ok(())
 }
 
