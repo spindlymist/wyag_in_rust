@@ -6,10 +6,11 @@ use std::{
 };
 
 use flate2::{read::ZlibDecoder, write::ZlibEncoder};
+use regex::Regex;
 
 use crate::{
     error::Error,
-    repo::{GitRepository, repo_open_file},
+    repo::{GitRepository, repo_open_file, repo_path}, refs::ref_resolve,
 };
 
 mod blob;
@@ -105,10 +106,63 @@ impl GitObject {
     }
 }
 
+
+/// Resolves a `name` to one or more object hashes.
+fn object_resolve(repo: &GitRepository, id: &str) -> Result<Vec<ObjectHash>, Error> {
+    let mut candidates = vec![];
+    
+    // TODO there should be some way to make this regex static
+    let hash_regex: Regex = Regex::new("^[0-9a-fA-F]{4,40}$").expect("Regex should be valid");
+    if hash_regex.is_match(id) {
+        if id.len() == 40 {
+            if let Ok(hash) = ObjectHash::try_from(id) {
+                candidates.push(hash);
+            }
+        }
+        else {
+            let object_dir_name = &id[..2];
+            let dir = repo_path(&repo, PathBuf::from("objects").join(object_dir_name));
+            if dir.exists() {
+                let hashes: Vec<ObjectHash> = std::fs::read_dir(dir)?
+                    .collect::<Result<Vec<std::fs::DirEntry>, _>>()?
+                    .into_iter()
+                    .map(|file| format!("{object_dir_name}{}", file.file_name().to_string_lossy()))
+                    .filter(|hash_string| hash_string.starts_with(id))
+                    .filter_map(|hash_string| ObjectHash::try_from(&hash_string[..]).ok())
+                    .collect();
+                candidates.extend(hashes);
+            }
+        }
+    }
+   
+    if id == "HEAD" {
+        candidates.push(ref_resolve(&repo, "HEAD")?);
+    }
+
+    if let Ok(local_branch) = ref_resolve(&repo, PathBuf::from("refs/heads").join(id)) {
+        candidates.push(local_branch);
+    }
+    
+    if let Ok(remote_branch) = ref_resolve(&repo, PathBuf::from("refs/remotes").join(id)) {
+        candidates.push(remote_branch);
+    }
+
+    if let Ok(tag) = ref_resolve(&repo, PathBuf::from("refs/tags").join(id)) {
+        candidates.push(tag);
+    }
+
+    Ok(candidates)
+}
+
 /// Finds the object in `repo` identified by `id`.
-pub fn object_find(_repo: &GitRepository, id: &str) -> Result<ObjectHash, Error> {
-    // For now, just try to parse id as an object hash
-    ObjectHash::try_from(id)
+pub fn object_find(repo: &GitRepository, id: &str) -> Result<ObjectHash, Error> {
+    let candidates = object_resolve(&repo, id)?;
+
+    match candidates.len() {
+        0 => Err(Error::BadObjectId),
+        1 => Ok(candidates[0]),
+        _ => Err(Error::AmbiguousObjectId(candidates)),
+    }
 }
 
 /// Read the object that hashes to `hash` from `repo`.

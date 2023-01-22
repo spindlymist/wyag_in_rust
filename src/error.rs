@@ -4,6 +4,8 @@ use std::{
     fmt,
 };
 
+use crate::object::ObjectHash;
+
 #[derive(Debug)]
 pub enum Error {
     WorkingDirectoryInvalid,
@@ -20,6 +22,8 @@ pub enum Error {
     BadKVLMFormat,
     BadTreeFormat,
     BadCommitFormat,
+    BadObjectId,
+    AmbiguousObjectId(Vec<ObjectHash>),
     Io(io::Error),
     Ini(ini::Error),
 }
