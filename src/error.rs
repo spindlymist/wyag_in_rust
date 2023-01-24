@@ -23,6 +23,7 @@ pub enum Error {
     BadTreeFormat,
     BadCommitFormat,
     BadObjectId,
+    BadIndexFormat(String),
     AmbiguousObjectId(Vec<ObjectHash>),
     Io(io::Error),
     Ini(ini::Error),
