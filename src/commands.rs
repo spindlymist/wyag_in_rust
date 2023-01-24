@@ -7,7 +7,7 @@ use clap::{Parser, Subcommand, Args};
 
 use crate::{
     error::Error,
-    repo::{GitRepository, repo_find},
+    repo::{GitRepository, repo_find, repo_open_file},
     object::{
         GitObject,
         ObjectHash,
@@ -18,7 +18,9 @@ use crate::{
         tree_checkout,
         tag_create,
         tag_create_lightweight,
-    }, refs::ref_list,
+    },
+    refs::ref_list,
+    index::index_parse,
 };
 
 #[derive(Parser)]
@@ -240,12 +242,25 @@ fn log_graphviz<'a>(repo: &GitRepository, hash: &'a ObjectHash, seen: &mut HashS
     }
 }
 
+/// List all the files in the staging index.
 #[derive(Args)]
 pub struct LsFilesArgs {
-    
+    // empty
 }
 
 pub fn cmd_ls_files(_args: LsFilesArgs) -> Result<(), Error> {
+    let index = {
+        let repo = repo_find(".")?;
+        let index_file = repo_open_file(&repo, "index", None)?;
+        let mut buf_reader = std::io::BufReader::new(index_file);
+
+        index_parse(&mut buf_reader)?
+    };
+
+    for entry in index.entries {
+        println!("{} {}", entry.hash, entry.path.to_string_lossy());
+    }
+
     Ok(())
 }
 
