@@ -240,10 +240,9 @@ where
     // entry should end with 0-7 additional NULL bytes (maintaining 8 byte alignment)
     {
         let entry_len = reader.stream_position()? - start_pos - 1;
-        let entry_len: usize = entry_len.try_into().expect("Entry should not be longer than usize::MAX bytes");
+        let entry_len: i64 = entry_len.try_into().expect("Entry should not be longer than i64::MAX bytes");
         let padding = (8 - (entry_len % 8)) - 1; // -1 because we already read one NULL byte above
-        let mut garbage_buf = [0u8; 7];
-        reader.read_exact(&mut garbage_buf[..padding])?;
+        reader.seek(std::io::SeekFrom::Current(padding))?;
     }
 
     Ok(IndexEntry {
