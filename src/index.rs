@@ -137,10 +137,17 @@ pub struct IndexEntry {
     pub path: PathBuf,
 }
 
+/// The index file (or staging area) that git uses to prepare the next commit.
+/// 
+/// See [the git docs](https://github.com/git/git/blob/master/Documentation/gitformat-index.txt)
+/// for detailed information.
+/// 
+/// This representation supports version 1-3. It does not support version 4.
+/// Extensions are not supported.
 pub struct Index {
     pub version: u32,
     pub entries: Vec<IndexEntry>,
-    // not supported: extension data
+    pub ext_data: Vec<u8>,
 }
 
 const INDEX_SIGNATURE: [u8; 4] = [b'D', b'I', b'R', b'C'];
@@ -160,6 +167,10 @@ where
     }
 
     let version = reader.read_u32::<BigEndian>()?;
+    if version > 3 {
+        return Err(Error::BadIndexFormat(format!("Unsupported version: {version}")));
+    }
+
     let entry_count = reader.read_u32::<BigEndian>()?;
 
     let mut entries = vec![];
@@ -167,9 +178,13 @@ where
         entries.push(parse_next_entry(reader)?);
     }
 
+    let mut ext_data = Vec::new();
+    reader.read_to_end(&mut ext_data)?;
+
     Ok(Index {
         version,
         entries,
+        ext_data,
     })
 }
 
@@ -234,15 +249,20 @@ where
             _ => (),
         };
 
+        if path.ends_with("/") {
+            return Err(Error::BadIndexFormat("Trailing slash is forbidden".to_owned()));
+        }
+
         PathBuf::from(path)
     };
 
     // entry should end with 0-7 additional NULL bytes (maintaining 8 byte alignment)
     {
-        let entry_len = reader.stream_position()? - start_pos - 1;
-        let entry_len: i64 = entry_len.try_into().expect("Entry should not be longer than i64::MAX bytes");
-        let padding = (8 - (entry_len % 8)) - 1; // -1 because we already read one NULL byte above
-        reader.seek(std::io::SeekFrom::Current(padding))?;
+        let entry_len: usize = (reader.stream_position()? - start_pos)
+            .try_into()
+            .expect("Entry length should not exceed usize::MAX");
+        let padding = calc_padding_len(entry_len, true);
+        reader.seek(std::io::SeekFrom::Current(padding as i64))?;
     }
 
     Ok(IndexEntry {
@@ -252,3 +272,13 @@ where
         path
     })
 }
+
+const fn calc_padding_len(len: usize, includes_trailing_null: bool) -> usize {
+    if includes_trailing_null {
+        calc_padding_len(len - 1, false) - 1
+    }
+    else {
+        8 - (len % 8)
+    }
+}
+

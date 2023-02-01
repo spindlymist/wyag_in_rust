@@ -257,7 +257,11 @@ pub fn cmd_ls_files(_args: LsFilesArgs) -> Result<(), Error> {
         index_parse(&mut buf_reader)?
     };
 
-    for entry in index.entries {
+    if index.ext_data.len() > 0 {
+        eprintln!("Warning: index contains unsupported extensions.");
+    }
+
+    for entry in &index.entries {
         println!("{} {}", entry.hash, entry.path.to_string_lossy());
     }
 
