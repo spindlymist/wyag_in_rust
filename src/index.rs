@@ -1,6 +1,7 @@
 use std::{
     io::{BufRead, Seek, Write},
     path::PathBuf,
+    collections::BTreeMap,
 };
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -12,16 +13,16 @@ use crate::{
 
 #[derive(PartialEq, Eq)]
 pub struct FileStats {
-    ctime_s: u32,
-    ctime_ns: u32,
-    mtime_s: u32,
-    mtime_ns: u32,
-    dev: u32,
-    ino: u32,
-    mode: u32,
-    uid: u32,
-    gid: u32,
-    size: u32,
+    pub ctime_s: u32,
+    pub ctime_ns: u32,
+    pub mtime_s: u32,
+    pub mtime_ns: u32,
+    pub dev: u32,
+    pub ino: u32,
+    pub mode: u32,
+    pub uid: u32,
+    pub gid: u32,
+    pub size: u32,
 }
 
 ///   A 16-bit 'flags' field split into (high to low bits)
@@ -38,8 +39,8 @@ pub struct FileStats {
 ///     1-bit intent-to-add flag (used by "git add -N")
 ///     13-bit unused, must be zero
 pub struct EntryFlags {
-    basic_flags: u16,
-    ext_flags: Option<u16>,
+    pub basic_flags: u16,
+    pub ext_flags: Option<u16>,
 }
 
 const MASK_ASSUME_VALID: u16      = 0b1000_0000_0000_0000;
@@ -146,7 +147,7 @@ pub struct IndexEntry {
 /// Extensions are not supported.
 pub struct Index {
     pub version: u32,
-    pub entries: Vec<IndexEntry>,
+    pub entries: BTreeMap<String, IndexEntry>,
     pub ext_data: Vec<u8>,
 }
 
@@ -173,9 +174,10 @@ where
 
     let entry_count = reader.read_u32::<BigEndian>()?;
 
-    let mut entries = vec![];
+    let mut entries = BTreeMap::new();
     for _ in 0..entry_count {
-        entries.push(parse_next_entry(reader)?);
+        let entry = parse_next_entry(reader)?;
+        entries.insert(entry.path.to_string_lossy().to_string(), entry);
     }
 
     let mut ext_data = Vec::new();
@@ -269,7 +271,7 @@ where
         stats,
         hash,
         flags,
-        path
+        path,
     })
 }
 
@@ -292,7 +294,7 @@ pub fn index_serialize(index: &Index) -> Result<Vec<u8>, Error> {
     data.write_u32::<BigEndian>(index.entries.len() as u32)?;
 
     // serialize entries
-    for entry in &index.entries {
+    for (_, entry) in &index.entries {
         let start_len = data.len();
 
         // file stats
