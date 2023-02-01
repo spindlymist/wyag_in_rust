@@ -20,7 +20,7 @@ use crate::{
         tag_create_lightweight,
     },
     refs::ref_list,
-    index::index_parse,
+    index::{index_parse, index_serialize},
 };
 
 #[derive(Parser)]

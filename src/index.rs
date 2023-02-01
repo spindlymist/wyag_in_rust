@@ -1,9 +1,9 @@
 use std::{
-    io::{BufRead, Seek},
+    io::{BufRead, Seek, Write},
     path::PathBuf,
 };
 
-use byteorder::{BigEndian, ReadBytesExt};
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::{
     error::Error,
@@ -282,3 +282,75 @@ const fn calc_padding_len(len: usize, includes_trailing_null: bool) -> usize {
     }
 }
 
+pub fn index_serialize(index: &Index) -> Result<Vec<u8>, Error> {
+    let min_size = index_size_lower_bound(&index);
+    let mut data: Vec<u8> = Vec::with_capacity(min_size);
+
+    // serialize header
+    data.write_all(&INDEX_SIGNATURE)?;
+    data.write_u32::<BigEndian>(index.version)?;
+    data.write_u32::<BigEndian>(index.entries.len() as u32)?;
+
+    // serialize entries
+    for entry in &index.entries {
+        let start_len = data.len();
+
+        // file stats
+        // this could be done faster as a simple memcpy
+        data.write_u32::<BigEndian>(entry.stats.ctime_s)?;
+        data.write_u32::<BigEndian>(entry.stats.ctime_ns)?;
+        data.write_u32::<BigEndian>(entry.stats.mtime_s)?;
+        data.write_u32::<BigEndian>(entry.stats.mtime_ns)?;
+        data.write_u32::<BigEndian>(entry.stats.dev)?;
+        data.write_u32::<BigEndian>(entry.stats.ino)?;
+        data.write_u32::<BigEndian>(entry.stats.mode)?;
+        data.write_u32::<BigEndian>(entry.stats.uid)?;
+        data.write_u32::<BigEndian>(entry.stats.gid)?;
+        data.write_u32::<BigEndian>(entry.stats.size)?;
+        
+        // hash
+        data.write_all(&entry.hash.raw)?;
+
+        // flags
+        data.write_u16::<BigEndian>(entry.flags.basic_flags)?;
+        if let Some(ext_flags) = entry.flags.ext_flags {
+            data.write_u16::<BigEndian>(ext_flags)?;
+        }
+
+        // path
+        data.write_all(entry.path.to_string_lossy().as_bytes())?;
+
+        // padding
+        let len = data.len() - start_len;
+        let padding = calc_padding_len(len, false);
+        data.write_all(&[0; 8][..padding])?;
+    }
+
+    // extensions
+    data.extend(&index.ext_data);
+
+    Ok(data)
+}
+
+fn index_size_lower_bound(index: &Index) -> usize {
+    const HEADER_SIZE: usize = {
+        const SIGNATURE_SIZE: usize = INDEX_SIGNATURE.len();
+        const VERSION_SIZE: usize = 4;
+        const ENTRY_COUNT_SIZE: usize = 4;
+
+        SIGNATURE_SIZE + VERSION_SIZE + ENTRY_COUNT_SIZE
+    };
+
+    const ENTRY_MIN_SIZE: usize = {
+        const STATS_SIZE: usize = 10 * 4;
+        const HASH_SIZE: usize = 20;
+        const FLAGS_MIN_SIZE: usize = 2;
+        const PATH_MIN_SIZE: usize = 1;
+
+        const ENTRY_MIN_SIZE: usize = STATS_SIZE + HASH_SIZE + FLAGS_MIN_SIZE + PATH_MIN_SIZE;
+
+        ENTRY_MIN_SIZE + calc_padding_len(ENTRY_MIN_SIZE, false)
+    };
+
+    HEADER_SIZE + (ENTRY_MIN_SIZE * index.entries.len())
+}
