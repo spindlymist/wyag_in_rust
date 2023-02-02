@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 
 use std::{
-    path::PathBuf, collections::HashSet,
+    path::PathBuf,
+    collections::HashSet,
 };
 use clap::{Parser, Subcommand, Args};
 
@@ -21,7 +22,7 @@ use crate::{
         object_hash,
     },
     refs::ref_list,
-    index::{index_parse, index_serialize},
+    index::{index_parse, index_add, index_write},
 };
 
 #[derive(Parser)]
@@ -71,12 +72,29 @@ impl Into<ObjectFormat> for ClapObjectFormat {
     }
 }
 
+/// Adds files to the staging index
 #[derive(Args)]
 pub struct AddArgs {
-
+    /// The file or directory to stage
+    path: PathBuf,
 }
 
-pub fn cmd_add(_args: AddArgs) -> Result<(), Error> {
+pub fn cmd_add(args: AddArgs) -> Result<(), Error> {
+    let repo = repo_find(".")?;
+    let mut index = {
+        let index_file = repo_open_file(&repo, "index", None)?;
+        let mut buf_reader = std::io::BufReader::new(index_file);
+
+        index_parse(&mut buf_reader)?
+    };
+
+    if index.ext_data.len() > 0 {
+        eprintln!("Warning: index contains unsupported extensions.");
+    }
+
+    index_add(&mut index, &repo, &args.path)?;
+    index_write(&index, &repo)?;
+
     Ok(())
 }
 
