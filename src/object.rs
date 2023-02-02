@@ -2,7 +2,6 @@ use std::{
     path::{PathBuf, Path},
     io::{Read, Write},
     str,
-    fmt,
 };
 
 use flate2::{read::ZlibDecoder, write::ZlibEncoder};
@@ -13,56 +12,19 @@ use crate::{
     repo::{GitRepository, repo_open_file, repo_path}, refs::ref_resolve,
 };
 
+mod format;
 mod blob;
 mod commit;
 mod hash;
 mod tag;
 mod tree;
 
+pub use format::ObjectFormat;
 pub use blob::Blob;
 pub use commit::Commit;
 pub use hash::ObjectHash;
 pub use tag::{Tag, tag_create, tag_create_lightweight};
 pub use tree::{Tree, tree_checkout};
-
-#[derive(PartialEq, Eq)]
-pub enum ObjectFormat {
-    Blob,
-    Commit,
-    Tag,
-    Tree,
-}
-
-impl fmt::Display for ObjectFormat {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use ObjectFormat::*;
-
-        let format_name = match self {
-            Blob => "blob",
-            Commit => "commit",
-            Tag => "tag",
-            Tree => "tree",
-        };
-
-        write!(f, "{format_name}")
-    }
-}
-
-impl TryFrom<&str> for ObjectFormat {
-    type Error = Error;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        use ObjectFormat::*;
-
-        match value {
-            "blob" => Ok(Blob),
-            "commit" => Ok(Commit),
-            "tag" => Ok(Tag),
-            "tree" => Ok(Tree),
-            _ => Err(Error::UnrecognizedObjectFormat),
-        }
-    }
-}
 
 pub enum GitObject {
     Blob(Blob),
