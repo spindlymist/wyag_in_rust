@@ -1,28 +1,62 @@
 use std::{
+    fs::{File, OpenOptions},
     io::{BufRead, Seek, Write},
-    path::PathBuf,
+    path::{PathBuf, Path},
     collections::BTreeMap,
+    time::SystemTime,
 };
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::{
     error::Error,
-    object::ObjectHash,
+    object::{ObjectHash, GitObject, ObjectFormat, object_hash, object_write},
+    repo::{GitRepository, repo_canonicalize, repo_open_file},
 };
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub struct FileStats {
-    pub ctime_s: u32,
-    pub ctime_ns: u32,
-    pub mtime_s: u32,
-    pub mtime_ns: u32,
-    pub dev: u32,
-    pub ino: u32,
-    pub mode: u32,
-    pub uid: u32,
-    pub gid: u32,
-    pub size: u32,
+    ctime_s: u32,
+    ctime_ns: u32,
+    mtime_s: u32,
+    mtime_ns: u32,
+    dev: u32,
+    ino: u32,
+    mode: u32,
+    uid: u32,
+    gid: u32,
+    size: u32,
+}
+
+impl FileStats {
+    fn from_file(file: &File) -> Result<FileStats, Error> {
+        let meta = file.metadata()?;
+
+        // ctime does NOT mean creation time on *nix, but git on windows
+        // uses the creation time here
+        let created_time = meta.created()?
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("Timestamp should be after UNIX epoch");
+
+        let modified_time = meta.modified()?
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("Timestamp should be after UNIX epoch");
+
+        let size: u32 = meta.len().try_into().expect("File size should fit into u32");
+
+        Ok(FileStats {
+            ctime_s: created_time.as_secs().try_into().expect("Timestamp should fit into u32"),
+            ctime_ns: created_time.subsec_nanos(),
+            mtime_s: modified_time.as_secs().try_into().expect("Timestamp should fit into u32"),
+            mtime_ns: modified_time.subsec_nanos(),
+            dev: 0, // only used on *nix
+            ino: 0, // only used on *nix
+            mode: 33188, // TODO figure out how git fills this field on Windows
+            uid: 0, // only used on *nix
+            gid: 0, // only used on *nix
+            size,
+        })
+    }
 }
 
 ///   A 16-bit 'flags' field split into (high to low bits)
@@ -38,6 +72,7 @@ pub struct FileStats {
 ///     1-bit skip-worktree flag (used by sparse checkout)
 ///     1-bit intent-to-add flag (used by "git add -N")
 ///     13-bit unused, must be zero
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub struct EntryFlags {
     basic_flags: u16,
     ext_flags: Option<u16>,
@@ -53,6 +88,15 @@ const MASK_EXT_INTENT_TO_ADD: u16 = 0b0010_0000_0000_0000;
 // const MASK_EXT_UNUSED: u16     = 0b0001_1111_1111_1111;
 
 impl EntryFlags {
+    pub fn new(name: &str) -> EntryFlags {
+        let mut flags = EntryFlags { basic_flags: 0, ext_flags: None };
+
+        let name_len = std::cmp::max(name.len(), 0xFFF);
+        flags.set_name_len(name_len.try_into().unwrap());
+
+        flags
+    }
+
     pub fn get_assume_valid(&self) -> bool {
         return (self.basic_flags & MASK_ASSUME_VALID) != 0;
     }
@@ -355,4 +399,88 @@ fn index_size_lower_bound(index: &Index) -> usize {
     };
 
     HEADER_SIZE + (ENTRY_MIN_SIZE * index.entries.len())
+}
+
+pub fn index_add<P>(index: &mut Index, repo: &GitRepository, path: P) -> Result<(), Error>
+where
+    P: AsRef<Path>
+{
+    if path.as_ref().file_name().unwrap_or_default() == ".git" {
+        Ok(())
+    }
+    else if path.as_ref().is_file() {
+        index_add_file(index, repo, path)
+    }
+    else if path.as_ref().is_dir() {
+        index_add_dir(index, repo, path)
+    }
+    else {
+        Err(Error::InvalidPath)
+    }
+}
+
+fn index_add_dir<P>(index: &mut Index, repo: &GitRepository, path: P) -> Result<(), Error>
+where
+    P: AsRef<Path>
+{
+    for entry in path.as_ref().read_dir()? {
+        index_add(index, repo, &entry?.path())?;
+    }
+
+    Ok(())
+}
+
+fn index_add_file<P>(index: &mut Index, repo: &GitRepository, path: P) -> Result<(), Error>
+where
+    P: AsRef<Path>
+{
+    let name = repo_canonicalize(repo, &path)?;
+    if name == ".gitignore" || name.starts_with("target/") { return Ok(()); }
+    let file = File::open(&path)?;
+    let stats = FileStats::from_file(&file)?;
+
+
+    let (object, flags) = if let Some(entry) = index.entries.get(&name) {
+        if entry.flags.get_assume_valid() || stats == entry.stats {
+            return Ok(());
+        }
+
+        let object = GitObject::from_stream(file, ObjectFormat::Blob)?;
+
+        let hash = object_hash(&object);
+        if hash == entry.hash {
+            return Ok(());
+        }
+
+        (object, entry.flags)
+    }
+    else {
+        let object = GitObject::from_stream(file, ObjectFormat::Blob)?;
+        let flags = EntryFlags::new(&name);
+
+        (object, flags)
+    };
+
+    let hash = object_write(&repo, &object)?;
+    let entry = IndexEntry {
+        stats,
+        hash,
+        flags,
+        path: PathBuf::from(&name),
+    };
+    index.entries.insert(name, entry);
+
+    Ok(())
+}
+
+pub fn index_write(index: &Index, repo: &GitRepository) -> Result<(), Error> {
+    let data = index_serialize(&index)?;
+    let mut options = OpenOptions::new();
+    options.write(true)
+        .create(true)
+        .truncate(true);
+    let mut index_file = repo_open_file(&repo, "index_WYAG", Some(&options))?;
+    index_file.write_all(&data)?;
+
+    Ok(())
 }
