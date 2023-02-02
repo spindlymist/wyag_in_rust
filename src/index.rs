@@ -373,7 +373,7 @@ pub fn index_serialize(index: &Index) -> Result<Vec<u8>, Error> {
     }
 
     // extensions
-    data.extend(&index.ext_data);
+    // data.extend(&index.ext_data);
 
     Ok(data)
 }
