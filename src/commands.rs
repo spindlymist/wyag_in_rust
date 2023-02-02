@@ -18,6 +18,7 @@ use crate::{
         tree_checkout,
         tag_create,
         tag_create_lightweight,
+        object_hash,
     },
     refs::ref_list,
     index::{index_parse, index_serialize},
@@ -167,9 +168,7 @@ pub struct HashObjectArgs {
 }
 
 pub fn cmd_hash_object(args: HashObjectArgs) -> Result<(), Error> {
-    // TODO move some of this logic to object module?
-    let data = std::fs::read_to_string(args.path)?.into_bytes();
-    let object = GitObject::deserialize(args.format.into(), data)?;
+    let object = GitObject::from_path(args.path, args.format.into())?;
     let hash;
 
     if args.write {
@@ -177,7 +176,7 @@ pub fn cmd_hash_object(args: HashObjectArgs) -> Result<(), Error> {
         hash = object_write(&repo, &object)?;
     }
     else {
-        hash = ObjectHash::new(object.serialize());
+        hash = object_hash(&object);
     }
 
     println!("{}", hash);

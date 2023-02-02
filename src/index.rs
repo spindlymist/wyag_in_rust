@@ -39,8 +39,8 @@ pub struct FileStats {
 ///     1-bit intent-to-add flag (used by "git add -N")
 ///     13-bit unused, must be zero
 pub struct EntryFlags {
-    pub basic_flags: u16,
-    pub ext_flags: Option<u16>,
+    basic_flags: u16,
+    ext_flags: Option<u16>,
 }
 
 const MASK_ASSUME_VALID: u16      = 0b1000_0000_0000_0000;
@@ -245,9 +245,9 @@ where
         };
 
         match path {
-            ".git" => return Err(Error::BadIndexFormat("Forbidden path".to_owned())),
-            ".." => return Err(Error::BadIndexFormat("Forbidden path".to_owned())),
-            "." => return Err(Error::BadIndexFormat("Forbidden path".to_owned())),
+            ".git" => return Err(Error::BadIndexFormat("Forbidden path .git".to_owned())),
+            ".." => return Err(Error::BadIndexFormat("Forbidden path ..".to_owned())),
+            "." => return Err(Error::BadIndexFormat("Forbidden path .".to_owned())),
             _ => (),
         };
 

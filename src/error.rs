@@ -26,6 +26,7 @@ pub enum Error {
     AmbiguousObjectId(Vec<ObjectHash>),
     BadIndexFormat(String),
     IndexHasExtensions,
+    InvalidPath,
     Io(io::Error),
     Ini(ini::Error),
 }

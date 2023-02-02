@@ -1,5 +1,5 @@
 use std::{
-    path::{PathBuf},
+    path::{PathBuf, Path},
     io::{Read, Write},
     str,
     fmt,
@@ -80,6 +80,7 @@ impl GitObject {
             GitObject::Tree(_) => ObjectFormat::Tree,
         }
     }
+
     pub fn serialize(&self) -> Vec<u8> {
         match self {
             GitObject::Blob(inner) => inner.serialize(),
@@ -88,6 +89,7 @@ impl GitObject {
             GitObject::Tree(inner) => inner.serialize(),
         }
     }
+
     pub fn serialize_into(self) -> Vec<u8> {
         match self {
             GitObject::Blob(inner) => inner.serialize_into(),
@@ -96,7 +98,8 @@ impl GitObject {
             GitObject::Tree(inner) => inner.serialize_into(),
         }
     }
-    pub fn deserialize(format: ObjectFormat, data: Vec<u8>) -> Result<GitObject, Error> {
+
+    pub fn deserialize(data: Vec<u8>, format: ObjectFormat) -> Result<GitObject, Error> {
         Ok(match format {
             ObjectFormat::Blob => GitObject::Blob(Blob::deserialize(data)?),
             ObjectFormat::Commit => GitObject::Commit(Commit::deserialize(data)?),
@@ -104,8 +107,24 @@ impl GitObject {
             ObjectFormat::Tree => GitObject::Tree(Tree::deserialize(data)?),
         })
     }
-}
 
+    pub fn from_path<P>(path: P, format: ObjectFormat) -> Result<GitObject, Error>
+    where
+        P: AsRef<Path>
+    {
+        Self::from_stream(std::fs::File::open(path)?, format)
+    }
+
+    pub fn from_stream<R>(mut stream: R, format: ObjectFormat) -> Result<GitObject, Error>
+    where
+        R: Read
+    {
+        let mut data = Vec::new();
+        stream.read_to_end(&mut data)?;
+
+        Self::deserialize(data, format)
+    }
+}
 
 /// Resolves a `name` to one or more object hashes.
 fn object_resolve(repo: &GitRepository, id: &str) -> Result<Vec<ObjectHash>, Error> {
@@ -208,17 +227,19 @@ pub fn object_read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject,
         return Err(Error::InvalidObjectHeader(format!("Malformed object {}: incorrect length", hash)));
     }
 
-    Ok(GitObject::deserialize(format, data)?)
+    Ok(GitObject::deserialize(data, format)?)
+}
+
+pub fn object_hash(object: &GitObject) -> ObjectHash {
+    let (hash, _) = object_prepare_for_storage(object);
+
+    hash
 }
 
 const COMPRESSION_LEVEL: u32 = 6;
 
 pub fn object_write(repo: &GitRepository, object: &GitObject) -> Result<ObjectHash, Error> {
-    let data = object.serialize();
-    let format = object.get_format();
-    let size = data.len();
-    let header = format!("{format} {size}\0").into_bytes();
-    let hash = ObjectHash::new(&data);
+    let (hash, data) = object_prepare_for_storage(object);
 
     let mut options = std::fs::OpenOptions::new();
     options
@@ -229,8 +250,21 @@ pub fn object_write(repo: &GitRepository, object: &GitObject) -> Result<ObjectHa
     let object_file = repo_open_file(&repo, path, Some(&options))?;
 
     let mut encoder = ZlibEncoder::new(object_file, flate2::Compression::new(COMPRESSION_LEVEL));
-    encoder.write_all(&header)?;
     encoder.write_all(&data)?;
 
     Ok(hash)
+}
+
+fn object_prepare_for_storage(object: &GitObject) -> (ObjectHash, Vec<u8>) {
+    let body = object.serialize();
+
+    let format = object.get_format();
+    let size = body.len();
+    let mut data = format!("{format} {size}\0").into_bytes();
+    data.extend(body);
+
+    let hash = ObjectHash::new(&data);
+
+    (hash, data) // TODO refactor so data buffer doesn't have to be copied
+                 // perhaps with VecDeque or have serialize return Write
 }

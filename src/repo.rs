@@ -11,7 +11,6 @@ use crate::{
 };
 
 pub struct GitRepository {
-    #[allow(dead_code)]
     working_dir: PathBuf,
     git_dir: PathBuf,
     config: Ini,
@@ -79,7 +78,7 @@ impl GitRepository {
     where
         P: AsRef<Path>
     {
-        let working_dir = PathBuf::from(dir.as_ref());
+        let working_dir = PathBuf::from(dir.as_ref().absolutize()?);
         if !working_dir.is_dir() {
             return Err(Error::WorkingDirectoryInvalid);
         }
@@ -104,6 +103,24 @@ impl GitRepository {
             config,
         })
     }
+}
+
+pub fn repo_canonicalize<P>(repo: &GitRepository, path: P) -> Result<String, Error>
+where
+    P: AsRef<Path>
+{
+    let abs_path = path.as_ref().absolutize()?;
+
+    let mut name = match abs_path.strip_prefix(&repo.working_dir) {
+        Ok(path) => path.to_string_lossy().replace("\\", "/"),
+        Err(_) => return Err(Error::InvalidPath),
+    };
+
+    if name.ends_with("/") {
+        name.truncate(name.len() - 1);
+    }
+
+    Ok(name)
 }
 
 pub fn repo_path<P>(repo: &GitRepository, rel_path: P) -> PathBuf
@@ -149,7 +166,7 @@ pub fn repo_find<P>(path: P) -> Result<GitRepository, Error>
 where
     P: AsRef<Path>
 {
-    let abs_path = fs::canonicalize(path)?;
+    let abs_path = path.as_ref().absolutize()?;
 
     // The existence of a .git directory is considered sufficient
     // evidence of a repository
