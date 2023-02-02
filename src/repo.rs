@@ -130,6 +130,13 @@ where
     repo.git_dir.join(rel_path)
 }
 
+pub fn repo_working_path<P>(repo: &GitRepository, rel_path: P) -> PathBuf
+where
+    P: AsRef<Path>
+{
+    repo.working_dir.join(rel_path)
+}
+
 pub fn repo_open_file<P>(repo: &GitRepository, rel_path: P, options: Option<&OpenOptions>) -> Result<File, Error>
 where
     P: AsRef<Path>

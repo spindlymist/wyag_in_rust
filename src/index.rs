@@ -11,7 +11,7 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use crate::{
     error::Error,
     object::{ObjectHash, GitObject, ObjectFormat, object_hash, object_write},
-    repo::{GitRepository, repo_canonicalize, repo_open_file},
+    repo::{GitRepository, repo_canonicalize, repo_open_file, repo_working_path},
 };
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
@@ -405,6 +405,34 @@ pub fn index_add<P>(index: &mut Index, repo: &GitRepository, path: P) -> Result<
 where
     P: AsRef<Path>
 {
+    index_prune_deleted_files(index, repo, &path)?;
+    index_add_path(index, repo, path)?;
+
+    Ok(())
+}
+
+fn index_prune_deleted_files<P>(index: &mut Index, repo: &GitRepository, path: P) -> Result<(), Error>
+where
+    P: AsRef<Path>
+{
+    if !path.as_ref().is_dir() {
+        return Ok(());
+    }
+
+    let dir_name = repo_canonicalize(repo, path)?;
+
+    index.entries.retain(|name, _| {
+        !name.starts_with(&dir_name)
+        || repo_working_path(repo, &name).is_file()
+    });
+
+    Ok(())
+}
+
+fn index_add_path<P>(index: &mut Index, repo: &GitRepository, path: P) -> Result<(), Error>
+where
+    P: AsRef<Path>
+{
     if path.as_ref().file_name().unwrap_or_default() == ".git" {
         Ok(())
     }
@@ -412,22 +440,14 @@ where
         index_add_file(index, repo, path)
     }
     else if path.as_ref().is_dir() {
-        index_add_dir(index, repo, path)
+        for entry in path.as_ref().read_dir()? {
+            index_add_path(index, repo, &entry?.path())?;
+        }
+        Ok(())
     }
     else {
         Err(Error::InvalidPath)
     }
-}
-
-fn index_add_dir<P>(index: &mut Index, repo: &GitRepository, path: P) -> Result<(), Error>
-where
-    P: AsRef<Path>
-{
-    for entry in path.as_ref().read_dir()? {
-        index_add(index, repo, &entry?.path())?;
-    }
-
-    Ok(())
 }
 
 fn index_add_file<P>(index: &mut Index, repo: &GitRepository, path: P) -> Result<(), Error>
@@ -435,10 +455,9 @@ where
     P: AsRef<Path>
 {
     let name = repo_canonicalize(repo, &path)?;
-    if name == ".gitignore" || name.starts_with("target/") { return Ok(()); }
+    if name.starts_with("target/") { return Ok(()); } // TODO .gitignore
     let file = File::open(&path)?;
     let stats = FileStats::from_file(&file)?;
-
 
     let (object, flags) = if let Some(entry) = index.entries.get(&name) {
         if entry.flags.get_assume_valid() || stats == entry.stats {
@@ -479,7 +498,7 @@ pub fn index_write(index: &Index, repo: &GitRepository) -> Result<(), Error> {
     options.write(true)
         .create(true)
         .truncate(true);
-    let mut index_file = repo_open_file(&repo, "index_WYAG", Some(&options))?;
+    let mut index_file = repo_open_file(&repo, "index", Some(&options))?;
     index_file.write_all(&data)?;
 
     Ok(())
