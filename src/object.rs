@@ -24,7 +24,7 @@ pub use blob::Blob;
 pub use commit::Commit;
 pub use hash::ObjectHash;
 pub use tag::{Tag, tag_create, tag_create_lightweight};
-pub use tree::{Tree, tree_checkout};
+pub use tree::{Tree, tree_checkout, tree_create_from_index};
 
 pub enum GitObject {
     Blob(Blob),

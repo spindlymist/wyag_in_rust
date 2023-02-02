@@ -1,7 +1,7 @@
-use std::path::Path;
+use std::{path::Path, collections::HashSet};
 
-use crate::{error::Error, repo::GitRepository};
-use super::{ObjectHash, object_read, GitObject};
+use crate::{error::Error, repo::GitRepository, index::Index};
+use super::{ObjectHash, object_read, GitObject, object_write};
 
 pub struct Tree {
     pub entries: Vec<TreeEntry>,
@@ -89,4 +89,49 @@ where
     }
 
     Ok(())
+}
+
+pub fn tree_create_from_index(index: &Index, repo: &GitRepository) -> Result<ObjectHash, Error> {
+    make_subtree(index, repo, "")
+}
+
+fn make_subtree(index: &Index, repo: &GitRepository, prefix: &str) -> Result<ObjectHash, Error> {
+    let mut entries = vec![];
+    let mut prefixes_handled: HashSet<&str> = HashSet::new();
+
+    for (name, index_entry) in &index.entries {
+        if let Some(suffix) = name.strip_prefix(&prefix) {
+            if let Some(slash_idx) = suffix.find('/') {
+                let new_prefix = &name[..=prefix.len() + slash_idx];
+
+                if prefixes_handled.contains(new_prefix) {
+                    continue;
+                }
+                else {
+                    prefixes_handled.insert(new_prefix);
+                }
+
+                let subtree_hash = make_subtree(index, repo, new_prefix)?;
+                let tree_entry = TreeEntry {
+                    mode: "040000".to_owned(),
+                    name: String::from(&suffix[..slash_idx]),
+                    hash: subtree_hash,
+                };
+                entries.push(tree_entry);
+            }
+            else {
+                let tree_entry = TreeEntry {
+                    mode: index_entry.stats.get_mode_string(),
+                    name: String::from(suffix),
+                    hash: index_entry.hash,
+                };
+                entries.push(tree_entry);
+            }
+        }
+    }
+
+    let tree = GitObject::Tree(Tree { entries });
+    let hash = object_write(repo, &tree)?;
+
+    Ok(hash)
 }

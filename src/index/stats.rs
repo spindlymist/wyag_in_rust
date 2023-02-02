@@ -48,4 +48,8 @@ impl FileStats {
             size,
         })
     }
+
+    pub fn get_mode_string(&self) -> String {
+        format!("{:06o}", self.mode)
+    }
 }
