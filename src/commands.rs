@@ -20,6 +20,7 @@ use crate::{
         tag_create,
         tag_create_lightweight,
         object_hash,
+        commit_create,
     },
     refs::ref_list,
     index::{index_parse, index_add, index_write},
@@ -167,6 +168,17 @@ pub struct CommitArgs {
 }
 
 pub fn cmd_commit(_args: CommitArgs) -> Result<(), Error> {
+    let repo = repo_find(".")?;
+    let index = {
+        let index_file = repo_open_file(&repo, "index", None)?;
+        let mut buf_reader = std::io::BufReader::new(index_file);
+
+        index_parse(&mut buf_reader)?
+    };
+
+    let hash = commit_create(&index, &repo)?;
+    println!("{hash}");
+
     Ok(())
 }
 
