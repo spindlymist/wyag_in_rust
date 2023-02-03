@@ -1,11 +1,11 @@
-use crate::error::Error;
+use crate::Result;
 
 pub struct Blob {
     data: Vec<u8>,
 }
 
 impl Blob {
-    pub fn deserialize(data: Vec<u8>) -> Result<Blob, Error> {
+    pub fn deserialize(data: Vec<u8>) -> Result<Blob> {
         Ok(Blob { data })
     }
 

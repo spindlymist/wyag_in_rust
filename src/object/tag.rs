@@ -5,7 +5,8 @@ use std::{
 use ordered_multimap::ListOrderedMultimap;
 
 use crate::{
-    error::Error,
+    Error,
+    Result,
     repo::GitRepository, refs::ref_create
 };
 
@@ -16,7 +17,7 @@ pub struct Tag {
 }
 
 impl Tag {
-    pub fn deserialize(data: Vec<u8>) -> Result<Tag, Error> {
+    pub fn deserialize(data: Vec<u8>) -> Result<Tag> {
         let data = match String::from_utf8(data) {
             Ok(data) => data,
             Err(_) => return Err(Error::BadKVLMFormat),
@@ -37,7 +38,7 @@ impl Tag {
     }
 }
 
-pub fn tag_create(repo: &GitRepository, name: &str, hash: &ObjectHash) -> Result<Tag, Error>
+pub fn tag_create(repo: &GitRepository, name: &str, hash: &ObjectHash) -> Result<Tag>
 {
     let mut map = ListOrderedMultimap::new();
 
@@ -60,7 +61,7 @@ pub fn tag_create(repo: &GitRepository, name: &str, hash: &ObjectHash) -> Result
     }
 }
 
-pub fn tag_create_lightweight(repo: &GitRepository, name: &str, hash: &ObjectHash) -> Result<(), Error>
+pub fn tag_create_lightweight(repo: &GitRepository, name: &str, hash: &ObjectHash) -> Result<()>
 {
     ref_create(repo, PathBuf::from("tags").join(name), hash)?;
 

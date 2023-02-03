@@ -8,7 +8,8 @@ use flate2::{read::ZlibDecoder, write::ZlibEncoder};
 use regex::Regex;
 
 use crate::{
-    error::Error,
+    Error,
+    Result,
     repo::{GitRepository, repo_open_file, repo_path}, refs::ref_resolve,
 };
 
@@ -61,7 +62,7 @@ impl GitObject {
         }
     }
 
-    pub fn deserialize(data: Vec<u8>, format: ObjectFormat) -> Result<GitObject, Error> {
+    pub fn deserialize(data: Vec<u8>, format: ObjectFormat) -> Result<GitObject> {
         Ok(match format {
             ObjectFormat::Blob => GitObject::Blob(Blob::deserialize(data)?),
             ObjectFormat::Commit => GitObject::Commit(Commit::deserialize(data)?),
@@ -70,14 +71,14 @@ impl GitObject {
         })
     }
 
-    pub fn from_path<P>(path: P, format: ObjectFormat) -> Result<GitObject, Error>
+    pub fn from_path<P>(path: P, format: ObjectFormat) -> Result<GitObject>
     where
         P: AsRef<Path>
     {
         Self::from_stream(std::fs::File::open(path)?, format)
     }
 
-    pub fn from_stream<R>(mut stream: R, format: ObjectFormat) -> Result<GitObject, Error>
+    pub fn from_stream<R>(mut stream: R, format: ObjectFormat) -> Result<GitObject>
     where
         R: Read
     {
@@ -89,7 +90,7 @@ impl GitObject {
 }
 
 /// Resolves a `name` to one or more object hashes.
-fn object_resolve(repo: &GitRepository, id: &str) -> Result<Vec<ObjectHash>, Error> {
+fn object_resolve(repo: &GitRepository, id: &str) -> Result<Vec<ObjectHash>> {
     let mut candidates = vec![];
     
     // TODO there should be some way to make this regex static
@@ -105,7 +106,7 @@ fn object_resolve(repo: &GitRepository, id: &str) -> Result<Vec<ObjectHash>, Err
             let dir = repo_path(repo, PathBuf::from("objects").join(object_dir_name));
             if dir.exists() {
                 let hashes: Vec<ObjectHash> = std::fs::read_dir(dir)?
-                    .collect::<Result<Vec<std::fs::DirEntry>, _>>()?
+                    .collect::<core::result::Result<Vec<std::fs::DirEntry>, _>>()?
                     .into_iter()
                     .map(|file| format!("{object_dir_name}{}", file.file_name().to_string_lossy()))
                     .filter(|hash_string| hash_string.starts_with(id))
@@ -136,7 +137,7 @@ fn object_resolve(repo: &GitRepository, id: &str) -> Result<Vec<ObjectHash>, Err
 }
 
 /// Finds the object in `repo` identified by `id`.
-pub fn object_find(repo: &GitRepository, id: &str) -> Result<ObjectHash, Error> {
+pub fn object_find(repo: &GitRepository, id: &str) -> Result<ObjectHash> {
     let candidates = object_resolve(repo, id)?;
 
     match candidates.len() {
@@ -147,7 +148,7 @@ pub fn object_find(repo: &GitRepository, id: &str) -> Result<ObjectHash, Error> 
 }
 
 /// Read the object that hashes to `hash` from `repo`.
-pub fn object_read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject, Error> {
+pub fn object_read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject> {
     let mut buf = Vec::new(); // TODO perhaps reserve some capacity here?
 
     // Read and decompress
@@ -200,7 +201,7 @@ pub fn object_hash(object: &GitObject) -> ObjectHash {
 
 const COMPRESSION_LEVEL: u32 = 6;
 
-pub fn object_write(repo: &GitRepository, object: &GitObject) -> Result<ObjectHash, Error> {
+pub fn object_write(repo: &GitRepository, object: &GitObject) -> Result<ObjectHash> {
     let (hash, data) = object_prepare_for_storage(object);
 
     let mut options = std::fs::OpenOptions::new();

@@ -1,7 +1,8 @@
 use ordered_multimap::ListOrderedMultimap;
 
 use crate::{
-    error::Error,
+    Error,
+    Result,
     repo::GitRepository,
     index::Index,
     branch::branch_update_current,
@@ -14,7 +15,7 @@ pub struct Commit {
 }
 
 impl Commit {
-    pub fn deserialize(data: Vec<u8>) -> Result<Commit, Error> {
+    pub fn deserialize(data: Vec<u8>) -> Result<Commit> {
         let data = match String::from_utf8(data) {
             Ok(data) => data,
             Err(_) => return Err(Error::BadKVLMFormat),
@@ -35,7 +36,7 @@ impl Commit {
     }
 }
 
-pub fn commit_create(index: &Index, repo: &GitRepository) -> Result<ObjectHash, Error> {
+pub fn commit_create(index: &Index, repo: &GitRepository) -> Result<ObjectHash> {
     let tree_hash = tree_create_from_index(index, repo)?;
     let parent_hash = object_find(repo, "HEAD")?;
 

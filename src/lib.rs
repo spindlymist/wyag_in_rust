@@ -4,6 +4,7 @@ pub use commands::Cli;
 
 pub mod error;
 pub use error::Error;
+pub use error::Result;
 
 pub mod repo;
 pub mod object;

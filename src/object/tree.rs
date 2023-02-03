@@ -1,6 +1,6 @@
 use std::{path::Path, collections::HashSet};
 
-use crate::{error::Error, repo::GitRepository, index::Index};
+use crate::{Error, Result, repo::GitRepository, index::Index};
 use super::{ObjectHash, object_read, GitObject, object_write};
 
 pub struct Tree {
@@ -14,7 +14,7 @@ pub struct TreeEntry {
 }
 
 impl Tree {
-    pub fn deserialize(data: Vec<u8>) -> Result<Tree, Error> {
+    pub fn deserialize(data: Vec<u8>) -> Result<Tree> {
         let mut entries = vec![];
         let mut iter = data.into_iter();
 
@@ -69,7 +69,7 @@ impl Tree {
     }
 }
 
-pub fn tree_checkout<P>(repo: &GitRepository, tree: &Tree, path: P) -> Result<(), Error>
+pub fn tree_checkout<P>(repo: &GitRepository, tree: &Tree, path: P) -> Result<()>
 where
     P: AsRef<Path>
 {
@@ -91,11 +91,11 @@ where
     Ok(())
 }
 
-pub fn tree_create_from_index(index: &Index, repo: &GitRepository) -> Result<ObjectHash, Error> {
+pub fn tree_create_from_index(index: &Index, repo: &GitRepository) -> Result<ObjectHash> {
     make_subtree(index, repo, "")
 }
 
-fn make_subtree(index: &Index, repo: &GitRepository, prefix: &str) -> Result<ObjectHash, Error> {
+fn make_subtree(index: &Index, repo: &GitRepository, prefix: &str) -> Result<ObjectHash> {
     let mut entries = vec![];
     let mut prefixes_handled: HashSet<&str> = HashSet::new();
 

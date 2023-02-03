@@ -1,7 +1,8 @@
 use std::fs;
 
 use crate::{
-    error::Error,
+    Error,
+    Result,
     refs::{ref_resolve, ref_create},
     repo::{GitRepository, repo_path},
     object::{ObjectHash}
@@ -12,7 +13,7 @@ pub enum Branch {
     Headless(ObjectHash),
 }
 
-pub fn branch_get_current(repo: &GitRepository) -> Result<Branch, Error> {
+pub fn branch_get_current(repo: &GitRepository) -> Result<Branch> {
     let head_path = repo_path(repo, "HEAD");
     let head_contents = fs::read_to_string(head_path)?;
     let head_contents = head_contents.trim();
@@ -32,7 +33,7 @@ pub fn branch_get_current(repo: &GitRepository) -> Result<Branch, Error> {
     }
 }
 
-pub fn branch_create(name: &str, repo: &GitRepository, commit_hash: &ObjectHash) -> Result<(), Error> {
+pub fn branch_create(name: &str, repo: &GitRepository, commit_hash: &ObjectHash) -> Result<()> {
     if branch_exists(name, repo)? {
         return Err(Error::BranchAlreadyExists);
     }
@@ -42,11 +43,11 @@ pub fn branch_create(name: &str, repo: &GitRepository, commit_hash: &ObjectHash)
     Ok(())
 }
 
-pub fn branch_delete(_name: &str, _repo: &GitRepository) -> Result<ObjectHash, Error> {
+pub fn branch_delete(_name: &str, _repo: &GitRepository) -> Result<ObjectHash> {
     todo!()
 }
 
-pub fn branch_update(name: &str, repo: &GitRepository, commit_hash: &ObjectHash) -> Result<(), Error> {
+pub fn branch_update(name: &str, repo: &GitRepository, commit_hash: &ObjectHash) -> Result<()> {
     if !branch_exists(name, repo)? {
         return Err(Error::InvalidRef);
     }
@@ -56,7 +57,7 @@ pub fn branch_update(name: &str, repo: &GitRepository, commit_hash: &ObjectHash)
     Ok(())
 }
 
-pub fn branch_update_current(repo: &GitRepository, commit_hash: &ObjectHash) -> Result<(), Error> {
+pub fn branch_update_current(repo: &GitRepository, commit_hash: &ObjectHash) -> Result<()> {
     match branch_get_current(repo)? {
         Branch::Named(branch_name) => {
             branch_update(&branch_name, repo, commit_hash)?;
@@ -70,7 +71,7 @@ pub fn branch_update_current(repo: &GitRepository, commit_hash: &ObjectHash) -> 
     Ok(())
 }
 
-pub fn branch_exists(name: &str, repo: &GitRepository) -> Result<bool, Error> {
+pub fn branch_exists(name: &str, repo: &GitRepository) -> Result<bool> {
     match ref_resolve(repo, format!("refs/heads/{name}")) {
         Ok(_) => Ok(true),
         Err(err) => match err {

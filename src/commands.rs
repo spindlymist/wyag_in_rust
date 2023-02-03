@@ -7,7 +7,8 @@ use std::{
 use clap::{Parser, Subcommand, Args};
 
 use crate::{
-    error::Error,
+    Error,
+    Result,
     repo::{GitRepository, repo_find, repo_open_file},
     object::{
         GitObject,
@@ -82,7 +83,7 @@ pub struct AddArgs {
     path: PathBuf,
 }
 
-pub fn cmd_add(args: AddArgs) -> Result<(), Error> {
+pub fn cmd_add(args: AddArgs) -> Result<()> {
     let repo = repo_find(".")?;
     let mut index = {
         let index_file = repo_open_file(&repo, "index", None)?;
@@ -111,7 +112,7 @@ pub struct BranchArgs {
     start_point: String,
 }
 
-pub fn cmd_branch(args: BranchArgs) -> Result<(), Error> {
+pub fn cmd_branch(args: BranchArgs) -> Result<()> {
     let repo = repo_find(".")?;
     if let Some(branch_name) = args.branch_name {
         if args.delete {
@@ -142,7 +143,7 @@ pub struct CatFileArgs {
     object: String,
 }
 
-pub fn cmd_cat_file(args: CatFileArgs) -> Result<(), Error> {
+pub fn cmd_cat_file(args: CatFileArgs) -> Result<()> {
     let repo = repo_find(".")?;
     let hash = object_find(&repo, &args.object)?;
     let object = object_read(&repo, &hash)?;
@@ -161,7 +162,7 @@ pub struct CheckoutArgs {
     path: PathBuf,
 }
 
-pub fn cmd_checkout(args: CheckoutArgs) -> Result<(), Error> {
+pub fn cmd_checkout(args: CheckoutArgs) -> Result<()> {
     let repo = repo_find(".")?;
     let hash = object_find(&repo, &args.commit)?;
     let mut object = object_read(&repo, &hash)?;
@@ -199,7 +200,7 @@ pub struct CommitArgs {
     
 }
 
-pub fn cmd_commit(_args: CommitArgs) -> Result<(), Error> {
+pub fn cmd_commit(_args: CommitArgs) -> Result<()> {
     let repo = repo_find(".")?;
     let index = {
         let index_file = repo_open_file(&repo, "index", None)?;
@@ -229,7 +230,7 @@ pub struct HashObjectArgs {
     path: PathBuf,
 }
 
-pub fn cmd_hash_object(args: HashObjectArgs) -> Result<(), Error> {
+pub fn cmd_hash_object(args: HashObjectArgs) -> Result<()> {
     let object = GitObject::from_path(args.path, args.format.into())?;
     let hash = if args.write {
         let repo = repo_find(".")?;
@@ -251,7 +252,7 @@ pub struct InitArgs {
     path: Option<PathBuf>,
 }
 
-pub fn cmd_init(args: InitArgs) -> Result<(), Error> {
+pub fn cmd_init(args: InitArgs) -> Result<()> {
     let path = args.path.unwrap_or(PathBuf::from("."));
     GitRepository::init(&path)?;
     
@@ -268,7 +269,7 @@ pub struct LogArgs {
     commit: String,
 }
 
-pub fn cmd_log(args: LogArgs) -> Result<(), Error> {
+pub fn cmd_log(args: LogArgs) -> Result<()> {
     let repo = repo_find(".")?;
 
     println!("digraph wyaglog{{");
@@ -279,7 +280,7 @@ pub fn cmd_log(args: LogArgs) -> Result<(), Error> {
     Ok(())
 }
 
-fn log_graphviz(repo: &GitRepository, hash: &ObjectHash, seen: &mut HashSet<ObjectHash>) -> Result<(), Error> {
+fn log_graphviz(repo: &GitRepository, hash: &ObjectHash, seen: &mut HashSet<ObjectHash>) -> Result<()> {
     if seen.contains(hash) {
         return Ok(());
     }
@@ -307,7 +308,7 @@ pub struct LsFilesArgs {
     // empty
 }
 
-pub fn cmd_ls_files(_args: LsFilesArgs) -> Result<(), Error> {
+pub fn cmd_ls_files(_args: LsFilesArgs) -> Result<()> {
     let index = {
         let repo = repo_find(".")?;
         let index_file = repo_open_file(&repo, "index", None)?;
@@ -334,7 +335,7 @@ pub struct LsTreeArgs {
     object: String,
 }
 
-pub fn cmd_ls_tree(args: LsTreeArgs) -> Result<(), Error> {
+pub fn cmd_ls_tree(args: LsTreeArgs) -> Result<()> {
     let repo = repo_find(".")?;
     let hash = object_find(&repo, &args.object)?;
     let tree = match object_read(&repo, &hash)? {
@@ -356,7 +357,7 @@ pub struct MergeArgs {
     
 }
 
-pub fn cmd_merge(_args: MergeArgs) -> Result<(), Error> {
+pub fn cmd_merge(_args: MergeArgs) -> Result<()> {
     Ok(())
 }
 
@@ -366,7 +367,7 @@ pub struct RebaseArgs {
     
 }
 
-pub fn cmd_rebase(_args: RebaseArgs) -> Result<(), Error> {
+pub fn cmd_rebase(_args: RebaseArgs) -> Result<()> {
     Ok(())
 }
 
@@ -377,7 +378,7 @@ pub struct RevParseArgs {
     name: String,
 }
 
-pub fn cmd_rev_parse(args: RevParseArgs) -> Result<(), Error> {
+pub fn cmd_rev_parse(args: RevParseArgs) -> Result<()> {
     let repo = repo_find(".")?;
     let hashes = match object_find(&repo, &args.name) {
         Ok(hash) => vec![hash],
@@ -407,7 +408,7 @@ pub struct RmArgs {
     
 }
 
-pub fn cmd_rm(_args: RmArgs) -> Result<(), Error> {
+pub fn cmd_rm(_args: RmArgs) -> Result<()> {
     Ok(())
 }
 
@@ -417,7 +418,7 @@ pub struct ShowRefArgs {
     // empty
 }
 
-pub fn cmd_show_ref(_args: ShowRefArgs) -> Result<(), Error> {
+pub fn cmd_show_ref(_args: ShowRefArgs) -> Result<()> {
     let repo = repo_find(".")?;
     let refs = ref_list(&repo)?;
 
@@ -443,7 +444,7 @@ pub struct TagArgs {
     object: String,
 }
 
-pub fn cmd_tag(args: TagArgs) -> Result<(), Error> {
+pub fn cmd_tag(args: TagArgs) -> Result<()> {
     if let Some(name) = args.name {
         let repo = repo_find(".")?;
         let hash = object_find(&repo, &args.object)?;

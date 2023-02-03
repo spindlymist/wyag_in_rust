@@ -8,7 +8,8 @@ use std::{
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::{
-    error::Error,
+    Error,
+    Result,
     object::{ObjectHash, GitObject, ObjectFormat, object_hash, object_write},
     repo::{GitRepository, repo_canonicalize, repo_open_file, repo_working_path},
 };
@@ -40,7 +41,7 @@ pub struct Index {
 
 const INDEX_SIGNATURE: [u8; 4] = [b'D', b'I', b'R', b'C'];
 
-pub fn index_parse<R>(reader: &mut R) -> Result<Index, Error>
+pub fn index_parse<R>(reader: &mut R) -> Result<Index>
 where
     R: BufRead + Seek
 {
@@ -77,7 +78,7 @@ where
     })
 }
 
-fn parse_next_entry<R>(reader: &mut R) -> Result<IndexEntry, Error>
+fn parse_next_entry<R>(reader: &mut R) -> Result<IndexEntry>
 where
     R: BufRead + Seek
 {
@@ -171,7 +172,7 @@ const fn calc_padding_len(len: usize, includes_trailing_null: bool) -> usize {
     }
 }
 
-pub fn index_serialize(index: &Index) -> Result<Vec<u8>, Error> {
+pub fn index_serialize(index: &Index) -> Result<Vec<u8>> {
     let min_size = index_size_lower_bound(index);
     let mut data: Vec<u8> = Vec::with_capacity(min_size);
 
@@ -244,7 +245,7 @@ fn index_size_lower_bound(index: &Index) -> usize {
     HEADER_SIZE + (ENTRY_MIN_SIZE * index.entries.len())
 }
 
-pub fn index_add<P>(index: &mut Index, repo: &GitRepository, path: P) -> Result<(), Error>
+pub fn index_add<P>(index: &mut Index, repo: &GitRepository, path: P) -> Result<()>
 where
     P: AsRef<Path>
 {
@@ -254,7 +255,7 @@ where
     Ok(())
 }
 
-fn index_prune_deleted_files<P>(index: &mut Index, repo: &GitRepository, path: P) -> Result<(), Error>
+fn index_prune_deleted_files<P>(index: &mut Index, repo: &GitRepository, path: P) -> Result<()>
 where
     P: AsRef<Path>
 {
@@ -272,7 +273,7 @@ where
     Ok(())
 }
 
-fn index_add_path<P>(index: &mut Index, repo: &GitRepository, path: P) -> Result<(), Error>
+fn index_add_path<P>(index: &mut Index, repo: &GitRepository, path: P) -> Result<()>
 where
     P: AsRef<Path>
 {
@@ -293,7 +294,7 @@ where
     }
 }
 
-fn index_add_file<P>(index: &mut Index, repo: &GitRepository, path: P) -> Result<(), Error>
+fn index_add_file<P>(index: &mut Index, repo: &GitRepository, path: P) -> Result<()>
 where
     P: AsRef<Path>
 {
@@ -335,7 +336,7 @@ where
     Ok(())
 }
 
-pub fn index_write(index: &Index, repo: &GitRepository) -> Result<(), Error> {
+pub fn index_write(index: &Index, repo: &GitRepository) -> Result<()> {
     let data = index_serialize(index)?;
     let mut options = OpenOptions::new();
     options.write(true)

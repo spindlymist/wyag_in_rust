@@ -5,12 +5,13 @@ use std::{
 };
 
 use crate::{
-    error::Error,
+    Error,
+    Result,
     repo::{GitRepository, repo_path},
     object::ObjectHash,
 };
 
-pub fn ref_create<P>(repo: &GitRepository, ref_name: P, ref_hash: &ObjectHash) -> Result<(), Error>
+pub fn ref_create<P>(repo: &GitRepository, ref_name: P, ref_hash: &ObjectHash) -> Result<()>
 where
     P: AsRef<Path>
 {
@@ -20,7 +21,7 @@ where
     Ok(())
 }
 
-pub fn ref_resolve<P>(repo: &GitRepository, ref_path: P) -> Result<ObjectHash, Error>
+pub fn ref_resolve<P>(repo: &GitRepository, ref_path: P) -> Result<ObjectHash>
 where
     P: AsRef<Path>
 {
@@ -42,7 +43,7 @@ where
     }
 }
 
-pub fn ref_list(repo: &GitRepository) -> Result<Vec<(String, ObjectHash)>, Error> {
+pub fn ref_list(repo: &GitRepository) -> Result<Vec<(String, ObjectHash)>> {
     let prev_working_dir = std::env::current_dir()?;
     std::env::set_current_dir(repo_path(repo, "."))?;
 
@@ -54,7 +55,7 @@ pub fn ref_list(repo: &GitRepository) -> Result<Vec<(String, ObjectHash)>, Error
     Ok(refs)
 }
 
-fn ref_list_recursive<P>(repo: &GitRepository, rel_path: P, refs: &mut Vec<(String, ObjectHash)>) -> Result<(), Error>
+fn ref_list_recursive<P>(repo: &GitRepository, rel_path: P, refs: &mut Vec<(String, ObjectHash)>) -> Result<()>
 where
     P: AsRef<Path>
 {

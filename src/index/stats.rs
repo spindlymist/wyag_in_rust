@@ -3,7 +3,7 @@ use std::{
     time::SystemTime,
 };
 
-use crate::error::Error;
+use crate::Result;
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub struct FileStats {
@@ -20,7 +20,7 @@ pub struct FileStats {
 }
 
 impl FileStats {
-    pub fn from_file(file: &File) -> Result<FileStats, Error> {
+    pub fn from_file(file: &File) -> Result<FileStats> {
         let meta = file.metadata()?;
 
         // ctime does NOT mean creation time on *nix, but git on windows

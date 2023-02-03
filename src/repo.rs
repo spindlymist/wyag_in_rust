@@ -7,7 +7,8 @@ use ini::Ini;
 use path_absolutize::Absolutize;
 
 use crate::{
-    error::Error,
+    Error,
+    Result,
 };
 
 pub struct GitRepository {
@@ -17,7 +18,7 @@ pub struct GitRepository {
 }
 
 impl GitRepository {
-    pub fn init<P>(dir: P) -> Result<GitRepository, Error>
+    pub fn init<P>(dir: P) -> Result<GitRepository>
     where
         P: AsRef<Path>
     {
@@ -74,7 +75,7 @@ impl GitRepository {
         Ok(repo)
     }
 
-    pub fn from_dir<P>(dir: P) -> Result<GitRepository, Error>
+    pub fn from_dir<P>(dir: P) -> Result<GitRepository>
     where
         P: AsRef<Path>
     {
@@ -105,7 +106,7 @@ impl GitRepository {
     }
 }
 
-pub fn repo_canonicalize<P>(repo: &GitRepository, path: P) -> Result<String, Error>
+pub fn repo_canonicalize<P>(repo: &GitRepository, path: P) -> Result<String>
 where
     P: AsRef<Path>
 {
@@ -137,7 +138,7 @@ where
     repo.working_dir.join(rel_path)
 }
 
-pub fn repo_open_file<P>(repo: &GitRepository, rel_path: P, options: Option<&OpenOptions>) -> Result<File, Error>
+pub fn repo_open_file<P>(repo: &GitRepository, rel_path: P, options: Option<&OpenOptions>) -> Result<File>
 where
     P: AsRef<Path>
 {    
@@ -155,7 +156,7 @@ where
     }
 }
 
-pub fn repo_make_dir<P>(repo: &GitRepository, rel_path: P) -> Result<PathBuf, Error>
+pub fn repo_make_dir<P>(repo: &GitRepository, rel_path: P) -> Result<PathBuf>
 where
     P: AsRef<Path>
 {
@@ -169,7 +170,7 @@ where
 }
 
 /// Finds the git repository that contains `path` (if it exists).
-pub fn repo_find<P>(path: P) -> Result<GitRepository, Error>
+pub fn repo_find<P>(path: P) -> Result<GitRepository>
 where
     P: AsRef<Path>
 {
