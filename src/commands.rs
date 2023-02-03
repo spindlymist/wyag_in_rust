@@ -24,6 +24,7 @@ use crate::{
     },
     refs::ref_list,
     index::{index_parse, index_add, index_write},
+    branch::{branch_delete, branch_create},
 };
 
 #[derive(Parser)]
@@ -36,6 +37,7 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
    Add(AddArgs),
+   Branch(BranchArgs),
    CatFile(CatFileArgs),
    Checkout(CheckoutArgs),
    Commit(CommitArgs),
@@ -95,6 +97,36 @@ pub fn cmd_add(args: AddArgs) -> Result<(), Error> {
 
     index_add(&mut index, &repo, &args.path)?;
     index_write(&index, &repo)?;
+
+    Ok(())
+}
+
+/// Create, list, and delete branches
+#[derive(Args)]
+pub struct BranchArgs {
+    #[arg(short, long)]
+    delete: bool,
+    branch_name: Option<String>,
+    #[arg(default_value = "HEAD")]
+    start_point: String,
+}
+
+pub fn cmd_branch(args: BranchArgs) -> Result<(), Error> {
+    let repo = repo_find(".")?;
+    if let Some(branch_name) = args.branch_name {
+        if args.delete {
+            branch_delete(&branch_name, &repo)?;
+        }
+        else {
+            let hash = object_find(&repo, &args.start_point)?;
+            branch_create(&branch_name, &repo, &hash)?;
+        }
+    }
+    else {
+        ref_list(&repo)?.iter()
+            .filter_map(|(name, _)| name.strip_prefix("refs/heads/"))
+            .for_each(|name| println!("{name}"));
+    }
 
     Ok(())
 }

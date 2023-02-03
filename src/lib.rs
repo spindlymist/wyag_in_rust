@@ -15,6 +15,7 @@ pub mod branch;
 pub fn run(cli: Cli) {
     let result = match cli.command {
         Commands::Add(args) => cmd_add(args),
+        Commands::Branch(args) => cmd_branch(args),
         Commands::CatFile(args) => cmd_cat_file(args),
         Commands::Checkout(args) => cmd_checkout(args),
         Commands::Commit(args) => cmd_commit(args),
