@@ -138,7 +138,7 @@ where
             _ => (),
         };
 
-        if path.ends_with("/") {
+        if path.ends_with('/') {
             return Err(Error::BadIndexFormat("Trailing slash is forbidden".to_owned()));
         }
 
@@ -172,7 +172,7 @@ const fn calc_padding_len(len: usize, includes_trailing_null: bool) -> usize {
 }
 
 pub fn index_serialize(index: &Index) -> Result<Vec<u8>, Error> {
-    let min_size = index_size_lower_bound(&index);
+    let min_size = index_size_lower_bound(index);
     let mut data: Vec<u8> = Vec::with_capacity(min_size);
 
     // serialize header
@@ -181,7 +181,7 @@ pub fn index_serialize(index: &Index) -> Result<Vec<u8>, Error> {
     data.write_u32::<BigEndian>(index.entries.len() as u32)?;
 
     // serialize entries
-    for (_, entry) in &index.entries {
+    for entry in index.entries.values() {
         let start_len = data.len();
 
         // file stats
@@ -266,7 +266,7 @@ where
 
     index.entries.retain(|name, _| {
         !name.starts_with(&dir_name)
-        || repo_working_path(repo, &name).is_file()
+        || repo_working_path(repo, name).is_file()
     });
 
     Ok(())
@@ -323,7 +323,7 @@ where
         (object, flags)
     };
 
-    let hash = object_write(&repo, &object)?;
+    let hash = object_write(repo, &object)?;
     let entry = IndexEntry {
         stats,
         hash,
@@ -336,12 +336,12 @@ where
 }
 
 pub fn index_write(index: &Index, repo: &GitRepository) -> Result<(), Error> {
-    let data = index_serialize(&index)?;
+    let data = index_serialize(index)?;
     let mut options = OpenOptions::new();
     options.write(true)
         .create(true)
         .truncate(true);
-    let mut index_file = repo_open_file(&repo, "index", Some(&options))?;
+    let mut index_file = repo_open_file(repo, "index", Some(&options))?;
     index_file.write_all(&data)?;
 
     Ok(())

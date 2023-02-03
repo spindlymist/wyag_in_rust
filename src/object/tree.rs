@@ -76,13 +76,13 @@ where
     for entry in &tree.entries {
         let object_path = path.as_ref().join(&entry.name);
 
-        match object_read(&repo, &entry.hash)? {
+        match object_read(repo, &entry.hash)? {
             GitObject::Blob(blob) => {
                 std::fs::write(object_path, blob.serialize_into())?;
             },
             GitObject::Tree(tree) => {
                 std::fs::create_dir(&object_path)?;
-                tree_checkout(&repo, &tree, object_path)?;
+                tree_checkout(repo, &tree, object_path)?;
             },
             _ => return Err(Error::BadTreeFormat),
         };
@@ -100,7 +100,7 @@ fn make_subtree(index: &Index, repo: &GitRepository, prefix: &str) -> Result<Obj
     let mut prefixes_handled: HashSet<&str> = HashSet::new();
 
     for (name, index_entry) in &index.entries {
-        if let Some(suffix) = name.strip_prefix(&prefix) {
+        if let Some(suffix) = name.strip_prefix(prefix) {
             if let Some(slash_idx) = suffix.find('/') {
                 let new_prefix = &name[..=prefix.len() + slash_idx];
 

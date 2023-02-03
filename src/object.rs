@@ -102,7 +102,7 @@ fn object_resolve(repo: &GitRepository, id: &str) -> Result<Vec<ObjectHash>, Err
         }
         else {
             let object_dir_name = &id[..2];
-            let dir = repo_path(&repo, PathBuf::from("objects").join(object_dir_name));
+            let dir = repo_path(repo, PathBuf::from("objects").join(object_dir_name));
             if dir.exists() {
                 let hashes: Vec<ObjectHash> = std::fs::read_dir(dir)?
                     .collect::<Result<Vec<std::fs::DirEntry>, _>>()?
@@ -117,18 +117,18 @@ fn object_resolve(repo: &GitRepository, id: &str) -> Result<Vec<ObjectHash>, Err
     }
    
     if id == "HEAD" {
-        candidates.push(ref_resolve(&repo, "HEAD")?);
+        candidates.push(ref_resolve(repo, "HEAD")?);
     }
 
-    if let Ok(local_branch) = ref_resolve(&repo, PathBuf::from("refs/heads").join(id)) {
+    if let Ok(local_branch) = ref_resolve(repo, PathBuf::from("refs/heads").join(id)) {
         candidates.push(local_branch);
     }
     
-    if let Ok(remote_branch) = ref_resolve(&repo, PathBuf::from("refs/remotes").join(id)) {
+    if let Ok(remote_branch) = ref_resolve(repo, PathBuf::from("refs/remotes").join(id)) {
         candidates.push(remote_branch);
     }
 
-    if let Ok(tag) = ref_resolve(&repo, PathBuf::from("refs/tags").join(id)) {
+    if let Ok(tag) = ref_resolve(repo, PathBuf::from("refs/tags").join(id)) {
         candidates.push(tag);
     }
 
@@ -137,7 +137,7 @@ fn object_resolve(repo: &GitRepository, id: &str) -> Result<Vec<ObjectHash>, Err
 
 /// Finds the object in `repo` identified by `id`.
 pub fn object_find(repo: &GitRepository, id: &str) -> Result<ObjectHash, Error> {
-    let candidates = object_resolve(&repo, id)?;
+    let candidates = object_resolve(repo, id)?;
 
     match candidates.len() {
         0 => Err(Error::BadObjectId),
@@ -153,7 +153,7 @@ pub fn object_read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject,
     // Read and decompress
     {
         let path = PathBuf::from("objects").join(hash.to_path());
-        let object_file = repo_open_file(&repo, path, None)?;
+        let object_file = repo_open_file(repo, path, None)?;
         let mut decoder = ZlibDecoder::new(object_file);
         decoder.read_to_end(&mut buf)?;
     }
@@ -170,26 +170,26 @@ pub fn object_read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject,
 
     let header = match str::from_utf8(&header) {
         Ok(val) => val,
-        Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {}: couldn't parse header", hash))),
+        Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: couldn't parse header"))),
     };
 
     let (format, size) = match header.split_once(' ') {
         Some((left, right)) => (ObjectFormat::try_from(left)?, right),
-        None => return Err(Error::InvalidObjectHeader(format!("Malformed object {}: not enough parts", hash))),
+        None => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: not enough parts"))),
     };
 
-    let size = match usize::from_str_radix(size, 10) {
+    let size = match str::parse(size) {
         Ok(val) => val,
-        Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {}: invalid length", hash))),
+        Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: invalid length"))),
     };
 
     // Validate size
     let data: Vec<u8> = iter.collect();
     if data.len() != size {
-        return Err(Error::InvalidObjectHeader(format!("Malformed object {}: incorrect length", hash)));
+        return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: incorrect length")));
     }
 
-    Ok(GitObject::deserialize(data, format)?)
+    GitObject::deserialize(data, format)
 }
 
 pub fn object_hash(object: &GitObject) -> ObjectHash {
@@ -209,7 +209,7 @@ pub fn object_write(repo: &GitRepository, object: &GitObject) -> Result<ObjectHa
         .write(true)
         .truncate(true);
     let path = PathBuf::from("objects").join(hash.to_path());
-    let object_file = repo_open_file(&repo, path, Some(&options))?;
+    let object_file = repo_open_file(repo, path, Some(&options))?;
 
     let mut encoder = ZlibEncoder::new(object_file, flate2::Compression::new(COMPRESSION_LEVEL));
     encoder.write_all(&data)?;

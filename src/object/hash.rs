@@ -36,7 +36,7 @@ impl ObjectHash {
 impl std::fmt::Display for ObjectHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let string_hash = base16ct::lower::encode_string(&self.raw);
-        write!(f, "{}", string_hash)
+        write!(f, "{string_hash}")
     }
 }
 

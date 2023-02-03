@@ -50,9 +50,9 @@ pub fn tag_create(repo: &GitRepository, name: &str, hash: &ObjectHash) -> Result
     let tag_object = GitObject::Tag(Tag {
         map
     });
-    let tag_hash = object_write(&repo, &tag_object)?;
+    let tag_hash = object_write(repo, &tag_object)?;
 
-    tag_create_lightweight(&repo, name, &tag_hash)?;
+    tag_create_lightweight(repo, name, &tag_hash)?;
 
     match tag_object {
         GitObject::Tag(tag) => Ok(tag),

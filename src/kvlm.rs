@@ -116,7 +116,7 @@ where
 /// ```
 pub fn kvlm_serialize(kvlm: &ListOrderedMultimap<String, String>) -> String {
     let header = kvlm.pairs()
-        .filter(|(key, _)| key.len() > 0)
+        .filter(|(key, _)| !key.is_empty())
         .map(|(key, values)| {
             values.map(|value| {
                 let value = value.replace('\n', "\n ");

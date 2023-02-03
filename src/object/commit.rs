@@ -37,7 +37,7 @@ impl Commit {
 
 pub fn commit_create(index: &Index, repo: &GitRepository) -> Result<ObjectHash, Error> {
     let tree_hash = tree_create_from_index(index, repo)?;
-    let parent_hash = object_find(&repo, "HEAD")?;
+    let parent_hash = object_find(repo, "HEAD")?;
 
     let mut map = ListOrderedMultimap::new();
     map.insert("tree".to_owned(), tree_hash.to_string());
@@ -49,7 +49,7 @@ pub fn commit_create(index: &Index, repo: &GitRepository) -> Result<ObjectHash, 
     let commit = GitObject::Commit(Commit {
         map
     });
-    let commit_hash = object_write(&repo, &commit)?;
+    let commit_hash = object_write(repo, &commit)?;
 
     branch_update_current(repo, &commit_hash)?;
 

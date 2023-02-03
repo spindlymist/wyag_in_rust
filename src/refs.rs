@@ -14,7 +14,7 @@ pub fn ref_create<P>(repo: &GitRepository, ref_name: P, ref_hash: &ObjectHash) -
 where
     P: AsRef<Path>
 {
-    let ref_path = repo_path(&repo, PathBuf::from("refs").join(ref_name));
+    let ref_path = repo_path(repo, PathBuf::from("refs").join(ref_name));
     fs::write(ref_path, format!("{ref_hash}\n"))?;
 
     Ok(())
@@ -24,7 +24,7 @@ pub fn ref_resolve<P>(repo: &GitRepository, ref_path: P) -> Result<ObjectHash, E
 where
     P: AsRef<Path>
 {
-    let ref_path = repo_path(&repo, ref_path);
+    let ref_path = repo_path(repo, ref_path);
     let ref_contents = match fs::read_to_string(ref_path) {
         Ok(val) => val,
         Err(err) => match err.kind() {
@@ -35,7 +35,7 @@ where
     let ref_contents = ref_contents.trim();
 
     if let Some(indirect_ref_path) = ref_contents.strip_prefix("ref: ") {
-        ref_resolve(&repo, indirect_ref_path)
+        ref_resolve(repo, indirect_ref_path)
     }
     else {
         ObjectHash::try_from(ref_contents)
@@ -44,10 +44,10 @@ where
 
 pub fn ref_list(repo: &GitRepository) -> Result<Vec<(String, ObjectHash)>, Error> {
     let prev_working_dir = std::env::current_dir()?;
-    std::env::set_current_dir(repo_path(&repo, "."))?;
+    std::env::set_current_dir(repo_path(repo, "."))?;
 
     let mut refs = Vec::new();
-    ref_list_recursive(&repo, "refs", &mut refs)?;
+    ref_list_recursive(repo, "refs", &mut refs)?;
 
     std::env::set_current_dir(prev_working_dir)?;
 
@@ -62,12 +62,12 @@ where
         let path = entry?.path();
 
         if path.is_dir() {
-            ref_list_recursive(&repo, path, refs)?;
+            ref_list_recursive(repo, path, refs)?;
         }
         else {
-            let ref_hash = ref_resolve(&repo, &path)?;
+            let ref_hash = ref_resolve(repo, &path)?;
             refs.push((
-                path.to_string_lossy().replace("\\", "/"),
+                path.to_string_lossy().replace('\\', "/"),
                 ref_hash,
             ));
         }

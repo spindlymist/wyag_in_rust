@@ -62,11 +62,11 @@ enum ClapObjectFormat {
     Blob,
 }
 
-impl Into<ObjectFormat> for ClapObjectFormat {
-    fn into(self) -> ObjectFormat {
+impl From<ClapObjectFormat> for ObjectFormat {
+    fn from(value: ClapObjectFormat) -> Self {
         use ClapObjectFormat::*;
 
-        match self {
+        match value {
             Commit => ObjectFormat::Commit,
             Tree => ObjectFormat::Tree,
             Tag => ObjectFormat::Tag,
@@ -91,7 +91,7 @@ pub fn cmd_add(args: AddArgs) -> Result<(), Error> {
         index_parse(&mut buf_reader)?
     };
 
-    if index.ext_data.len() > 0 {
+    if !index.ext_data.is_empty() {
         eprintln!("Warning: index contains unsupported extensions.");
     }
 
@@ -231,17 +231,15 @@ pub struct HashObjectArgs {
 
 pub fn cmd_hash_object(args: HashObjectArgs) -> Result<(), Error> {
     let object = GitObject::from_path(args.path, args.format.into())?;
-    let hash;
-
-    if args.write {
+    let hash = if args.write {
         let repo = repo_find(".")?;
-        hash = object_write(&repo, &object)?;
+        object_write(&repo, &object)?
     }
     else {
-        hash = object_hash(&object);
-    }
+        object_hash(&object)
+    };
 
-    println!("{}", hash);
+    println!("{hash}");
 
     Ok(())
 }
@@ -281,19 +279,19 @@ pub fn cmd_log(args: LogArgs) -> Result<(), Error> {
     Ok(())
 }
 
-fn log_graphviz<'a>(repo: &GitRepository, hash: &'a ObjectHash, seen: &mut HashSet<ObjectHash>) -> Result<(), Error> {
+fn log_graphviz(repo: &GitRepository, hash: &ObjectHash, seen: &mut HashSet<ObjectHash>) -> Result<(), Error> {
     if seen.contains(hash) {
         return Ok(());
     }
     seen.insert(*hash);
 
-    let commit = object_read(&repo, &hash)?;
+    let commit = object_read(repo, hash)?;
 
     if let GitObject::Commit(commit) = commit {
         for parent in commit.map.get_all("parent") {
             let parent_hash = ObjectHash::try_from(&parent[..])?;
-            println!("c_{} -> c_{}", hash, parent_hash);
-            log_graphviz(&repo, &parent_hash, seen)?;
+            println!("c_{hash} -> c_{parent_hash}");
+            log_graphviz(repo, &parent_hash, seen)?;
         }
 
         Ok(())
@@ -318,11 +316,11 @@ pub fn cmd_ls_files(_args: LsFilesArgs) -> Result<(), Error> {
         index_parse(&mut buf_reader)?
     };
 
-    if index.ext_data.len() > 0 {
+    if !index.ext_data.is_empty() {
         eprintln!("Warning: index contains unsupported extensions.");
     }
 
-    for (_, entry) in &index.entries {
+    for entry in index.entries.values() {
         println!("{} {}", entry.hash, entry.path.to_string_lossy());
     }
 
@@ -391,7 +389,7 @@ pub fn cmd_rev_parse(args: RevParseArgs) -> Result<(), Error> {
     };
 
     match hashes.len() {
-        0 => println!(""),
+        0 => println!(),
         1 => println!("{}", hashes[0]),
         n => {
             println!("{} is ambiguous: {n} matches", args.name);

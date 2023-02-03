@@ -112,11 +112,11 @@ where
     let abs_path = path.as_ref().absolutize()?;
 
     let mut name = match abs_path.strip_prefix(&repo.working_dir) {
-        Ok(path) => path.to_string_lossy().replace("\\", "/"),
+        Ok(path) => path.to_string_lossy().replace('\\', "/"),
         Err(_) => return Err(Error::InvalidPath),
     };
 
-    if name.ends_with("/") {
+    if name.ends_with('/') {
         name.truncate(name.len() - 1);
     }
 
@@ -145,7 +145,7 @@ where
         repo_make_dir(repo, parent_path)?;
     }
     
-    let abs_path = repo_path(&repo, rel_path);
+    let abs_path = repo_path(repo, rel_path);
 
     if let Some(options) = options {
         Ok(options.open(abs_path)?)
@@ -159,7 +159,7 @@ pub fn repo_make_dir<P>(repo: &GitRepository, rel_path: P) -> Result<PathBuf, Er
 where
     P: AsRef<Path>
 {
-    let abs_path = repo_path(&repo, rel_path);
+    let abs_path = repo_path(repo, rel_path);
 
     if !abs_path.is_dir() {
         fs::create_dir_all(&abs_path)?;

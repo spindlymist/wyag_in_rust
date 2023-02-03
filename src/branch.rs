@@ -51,7 +51,7 @@ pub fn branch_update(name: &str, repo: &GitRepository, commit_hash: &ObjectHash)
         return Err(Error::InvalidRef);
     }
 
-    ref_create(repo, format!("heads/{name}"), &commit_hash)?;
+    ref_create(repo, format!("heads/{name}"), commit_hash)?;
 
     Ok(())
 }
@@ -59,7 +59,7 @@ pub fn branch_update(name: &str, repo: &GitRepository, commit_hash: &ObjectHash)
 pub fn branch_update_current(repo: &GitRepository, commit_hash: &ObjectHash) -> Result<(), Error> {
     match branch_get_current(repo)? {
         Branch::Named(branch_name) => {
-            branch_update(&branch_name, repo, &commit_hash)?;
+            branch_update(&branch_name, repo, commit_hash)?;
         },
         Branch::Headless(_) => {
             let head_path = repo_path(repo, "HEAD");

@@ -37,7 +37,7 @@ impl EntryFlags {
     }
 
     pub fn get_assume_valid(&self) -> bool {
-        return (self.basic_flags & MASK_ASSUME_VALID) != 0;
+        (self.basic_flags & MASK_ASSUME_VALID) != 0
     }
 
     pub fn set_assume_valid(&mut self) {
@@ -49,7 +49,7 @@ impl EntryFlags {
     }
 
     pub fn get_extended(&self) -> bool {
-        return (self.basic_flags & MASK_EXTENDED) != 0;
+        (self.basic_flags & MASK_EXTENDED) != 0
     }
 
     pub fn set_extended(&mut self) {
@@ -62,7 +62,7 @@ impl EntryFlags {
         self.ext_flags = None;
     }
 
-    pub fn get_stage(&self) -> () {
+    pub fn get_stage(&self) {
         match self.basic_flags & MASK_STAGE {
             0b0000_0000_0000_0000 => (),
             0b0001_0000_0000_0000 => (),
@@ -77,7 +77,7 @@ impl EntryFlags {
     }
 
     pub fn get_name_len(&self) -> u16 {
-        return self.basic_flags & MASK_NAME_LEN;
+        self.basic_flags & MASK_NAME_LEN
     }
 
     pub fn set_name_len(&mut self, value: u16) {
@@ -90,7 +90,7 @@ impl EntryFlags {
     }
 
     pub fn get_skip_worktree(&self) -> bool {
-        return (self.ext_flags.unwrap() & MASK_EXT_SKIP_WORKTREE) != 0;
+        (self.ext_flags.unwrap() & MASK_EXT_SKIP_WORKTREE) != 0
     }
 
     pub fn set_skip_worktree(&mut self) {
@@ -102,7 +102,7 @@ impl EntryFlags {
     }
 
     pub fn get_intent_to_add(&self) -> bool {
-        return (self.ext_flags.unwrap() & MASK_EXT_INTENT_TO_ADD) != 0;
+        (self.ext_flags.unwrap() & MASK_EXT_INTENT_TO_ADD) != 0
     }
 
     pub fn set_intent_to_add(&mut self) {
