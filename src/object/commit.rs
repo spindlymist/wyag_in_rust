@@ -1,6 +1,11 @@
 use ordered_multimap::ListOrderedMultimap;
 
-use crate::{error::Error, repo::GitRepository, index::Index};
+use crate::{
+    error::Error,
+    repo::GitRepository,
+    index::Index,
+    branch::branch_update_current,
+};
 
 use super::{tree_create_from_index, object_write, ObjectHash, GitObject, object_find};
 
@@ -46,7 +51,7 @@ pub fn commit_create(index: &Index, repo: &GitRepository) -> Result<ObjectHash, 
     });
     let commit_hash = object_write(&repo, &commit)?;
 
-    // TODO update branch pointer to new commit
+    branch_update_current(repo, &commit_hash)?;
 
     Ok(commit_hash)
 }

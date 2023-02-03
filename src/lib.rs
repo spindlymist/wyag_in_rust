@@ -10,6 +10,7 @@ pub mod object;
 pub mod refs;
 pub mod kvlm;
 pub mod index;
+pub mod branch;
 
 pub fn run(cli: Cli) {
     let result = match cli.command {

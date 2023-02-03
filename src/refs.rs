@@ -1,12 +1,12 @@
 use std::{
     fs,
-    io::{Write},
+    io,
     path::{Path, PathBuf},
 };
 
 use crate::{
     error::Error,
-    repo::{GitRepository, repo_path, repo_open_file},
+    repo::{GitRepository, repo_path},
     object::ObjectHash,
 };
 
@@ -14,13 +14,8 @@ pub fn ref_create<P>(repo: &GitRepository, ref_name: P, ref_hash: &ObjectHash) -
 where
     P: AsRef<Path>
 {
-    let mut options = fs::OpenOptions::new();
-    options
-        .create(true)
-        .write(true)
-        .truncate(true);
-    let mut ref_file = repo_open_file(&repo, PathBuf::from("refs").join(ref_name), Some(&options))?;
-    write!(ref_file, "{ref_hash}\n")?;
+    let ref_path = repo_path(&repo, PathBuf::from("refs").join(ref_name));
+    fs::write(ref_path, format!("{ref_hash}\n"))?;
 
     Ok(())
 }
@@ -30,11 +25,16 @@ where
     P: AsRef<Path>
 {
     let ref_path = repo_path(&repo, ref_path);
-    let ref_contents = fs::read_to_string(ref_path)?;
+    let ref_contents = match fs::read_to_string(ref_path) {
+        Ok(val) => val,
+        Err(err) => match err.kind() {
+            io::ErrorKind::NotFound => return Err(Error::InvalidRef),
+            _ => return Err(err.into()),
+        },
+    };
     let ref_contents = ref_contents.trim();
 
-    if ref_contents.starts_with("ref: ") {
-        let indirect_ref_path = &ref_contents["ref: ".len()..];
+    if let Some(indirect_ref_path) = ref_contents.strip_prefix("ref: ") {
         ref_resolve(&repo, indirect_ref_path)
     }
     else {

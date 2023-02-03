@@ -27,6 +27,9 @@ pub enum Error {
     BadIndexFormat(String),
     IndexHasExtensions,
     InvalidPath,
+    InvalidRef,
+    BranchAlreadyExists,
+    UnrecognizedHeadRef,
     Io(io::Error),
     Ini(ini::Error),
 }
