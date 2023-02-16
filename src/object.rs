@@ -10,7 +10,8 @@ use regex::Regex;
 use crate::{
     Error,
     Result,
-    repo::GitRepository, refs::ref_resolve,
+    repo::GitRepository,
+    refs,
 };
 
 mod format;
@@ -117,18 +118,18 @@ impl GitObject {
         }
 
         if id == "HEAD" {
-            candidates.push(ref_resolve(repo, "HEAD")?);
+            candidates.push(refs::resolve(repo, "HEAD")?);
         }
 
-        if let Ok(local_branch) = ref_resolve(repo, PathBuf::from("refs/heads").join(id)) {
+        if let Ok(local_branch) = refs::resolve(repo, PathBuf::from("refs/heads").join(id)) {
             candidates.push(local_branch);
         }
 
-        if let Ok(remote_branch) = ref_resolve(repo, PathBuf::from("refs/remotes").join(id)) {
+        if let Ok(remote_branch) = refs::resolve(repo, PathBuf::from("refs/remotes").join(id)) {
             candidates.push(remote_branch);
         }
 
-        if let Ok(tag) = ref_resolve(repo, PathBuf::from("refs/tags").join(id)) {
+        if let Ok(tag) = refs::resolve(repo, PathBuf::from("refs/tags").join(id)) {
             candidates.push(tag);
         }
 

@@ -3,7 +3,7 @@ use std::fs;
 use crate::{
     Error,
     Result,
-    refs::{ref_resolve, ref_create},
+    refs,
     repo::GitRepository,
     object::{ObjectHash}
 };
@@ -13,7 +13,7 @@ pub enum Branch {
     Headless(ObjectHash),
 }
 
-pub fn branch_get_current(repo: &GitRepository) -> Result<Branch> {
+pub fn get_current(repo: &GitRepository) -> Result<Branch> {
     let head_path = repo.path("HEAD");
     let head_contents = fs::read_to_string(head_path)?;
     let head_contents = head_contents.trim();
@@ -33,34 +33,34 @@ pub fn branch_get_current(repo: &GitRepository) -> Result<Branch> {
     }
 }
 
-pub fn branch_create(name: &str, repo: &GitRepository, commit_hash: &ObjectHash) -> Result<()> {
-    if branch_exists(name, repo)? {
+pub fn create(name: &str, repo: &GitRepository, commit_hash: &ObjectHash) -> Result<()> {
+    if exists(name, repo)? {
         return Err(Error::BranchAlreadyExists);
     }
 
-    ref_create(repo, format!("heads/{name}"), commit_hash)?;
+    refs::create(repo, format!("heads/{name}"), commit_hash)?;
 
     Ok(())
 }
 
-pub fn branch_delete(_name: &str, _repo: &GitRepository) -> Result<ObjectHash> {
+pub fn delete(_name: &str, _repo: &GitRepository) -> Result<ObjectHash> {
     todo!()
 }
 
-pub fn branch_update(name: &str, repo: &GitRepository, commit_hash: &ObjectHash) -> Result<()> {
-    if !branch_exists(name, repo)? {
+pub fn update(name: &str, repo: &GitRepository, commit_hash: &ObjectHash) -> Result<()> {
+    if !exists(name, repo)? {
         return Err(Error::InvalidRef);
     }
 
-    ref_create(repo, format!("heads/{name}"), commit_hash)?;
+    refs::create(repo, format!("heads/{name}"), commit_hash)?;
 
     Ok(())
 }
 
-pub fn branch_update_current(repo: &GitRepository, commit_hash: &ObjectHash) -> Result<()> {
-    match branch_get_current(repo)? {
+pub fn update_current(repo: &GitRepository, commit_hash: &ObjectHash) -> Result<()> {
+    match get_current(repo)? {
         Branch::Named(branch_name) => {
-            branch_update(&branch_name, repo, commit_hash)?;
+            update(&branch_name, repo, commit_hash)?;
         },
         Branch::Headless(_) => {
             let head_path = repo.path("HEAD");
@@ -71,8 +71,8 @@ pub fn branch_update_current(repo: &GitRepository, commit_hash: &ObjectHash) -> 
     Ok(())
 }
 
-pub fn branch_exists(name: &str, repo: &GitRepository) -> Result<bool> {
-    match ref_resolve(repo, format!("refs/heads/{name}")) {
+pub fn exists(name: &str, repo: &GitRepository) -> Result<bool> {
+    match refs::resolve(repo, format!("refs/heads/{name}")) {
         Ok(_) => Ok(true),
         Err(err) => match err {
             Error::InvalidRef => Ok(false),

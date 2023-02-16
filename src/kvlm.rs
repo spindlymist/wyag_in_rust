@@ -49,7 +49,7 @@ use crate::error::Error;
 /// assert_eq!( vec!["English", "Rust"], map.get_all("languages").collect::<Vec<&String>>() );
 /// assert_eq!( "This is my message.\nIt has two lines.", map.get("").unwrap() );
 /// ```
-pub fn kvlm_parse(data: &str) -> Result<ListOrderedMultimap<String, String>, Error> {
+pub fn parse(data: &str) -> Result<ListOrderedMultimap<String, String>, Error> {
     let mut map = ListOrderedMultimap::new();
 
     let (header, message) = match data.split_once("\n\n") {
@@ -114,7 +114,7 @@ where
 /// This is my message.
 /// It has two lines.");
 /// ```
-pub fn kvlm_serialize(kvlm: &ListOrderedMultimap<String, String>) -> String {
+pub fn serialize(kvlm: &ListOrderedMultimap<String, String>) -> String {
     let header = kvlm.pairs()
         .filter(|(key, _)| !key.is_empty())
         .map(|(key, values)| {

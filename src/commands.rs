@@ -17,9 +17,9 @@ use crate::{
         Commit,
         Tag,
     },
-    refs::ref_list,
+    refs,
     index::Index,
-    branch::{branch_delete, branch_create},
+    branch,
 };
 
 #[derive(Parser)]
@@ -105,15 +105,15 @@ pub fn cmd_branch(args: BranchArgs) -> Result<()> {
     let repo = GitRepository::find(".")?;
     if let Some(branch_name) = args.branch_name {
         if args.delete {
-            branch_delete(&branch_name, &repo)?;
+            branch::delete(&branch_name, &repo)?;
         }
         else {
             let hash = GitObject::find(&repo, &args.start_point)?;
-            branch_create(&branch_name, &repo, &hash)?;
+            branch::create(&branch_name, &repo, &hash)?;
         }
     }
     else {
-        ref_list(&repo)?.iter()
+        refs::list(&repo)?.iter()
             .filter_map(|(name, _)| name.strip_prefix("refs/heads/"))
             .for_each(|name| println!("{name}"));
     }
@@ -399,7 +399,7 @@ pub struct ShowRefArgs {
 
 pub fn cmd_show_ref(_args: ShowRefArgs) -> Result<()> {
     let repo = GitRepository::find(".")?;
-    let refs = ref_list(&repo)?;
+    let refs = refs::list(&repo)?;
 
     for (name, hash) in refs {
         println!("{hash} {name}");
@@ -437,7 +437,7 @@ pub fn cmd_tag(args: TagArgs) -> Result<()> {
     }
     else {
         let repo = GitRepository::find(".")?;
-        let refs = ref_list(&repo)?;
+        let refs = refs::list(&repo)?;
         let tag_names = refs.iter()
             .filter(|(name, _)| name.starts_with("refs/tags/"))
             .map(|(name, _)| &name["refs/tags/".len()..]);

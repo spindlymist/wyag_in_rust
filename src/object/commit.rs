@@ -5,7 +5,7 @@ use crate::{
     Result,
     repo::GitRepository,
     index::Index,
-    branch::branch_update_current,
+    branch,
 };
 
 use super::{Tree, ObjectHash, GitObject};
@@ -31,7 +31,7 @@ impl Commit {
         });
         let commit_hash = commit.write(repo)?;
     
-        branch_update_current(repo, &commit_hash)?;
+        branch::update_current(repo, &commit_hash)?;
     
         Ok(commit_hash)
     }
@@ -41,7 +41,7 @@ impl Commit {
             Ok(data) => data,
             Err(_) => return Err(Error::BadKVLMFormat),
         };
-        let map = crate::kvlm::kvlm_parse(&data)?;
+        let map = crate::kvlm::parse(&data)?;
 
         Ok(Commit {
             map,
@@ -49,7 +49,7 @@ impl Commit {
     }
 
     pub fn serialize(&self) -> Vec<u8> {
-        crate::kvlm::kvlm_serialize(&self.map).into_bytes()
+        crate::kvlm::serialize(&self.map).into_bytes()
     }
 
     pub fn serialize_into(self) -> Vec<u8> {

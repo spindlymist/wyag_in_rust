@@ -7,7 +7,8 @@ use ordered_multimap::ListOrderedMultimap;
 use crate::{
     Error,
     Result,
-    repo::GitRepository, refs::ref_create
+    repo::GitRepository,
+    refs,
 };
 
 use super::{ObjectHash, GitObject};
@@ -42,7 +43,7 @@ impl Tag {
     
     pub fn create_lightweight(repo: &GitRepository, name: &str, hash: &ObjectHash) -> Result<()>
     {
-        ref_create(repo, PathBuf::from("tags").join(name), hash)?;
+        refs::create(repo, PathBuf::from("tags").join(name), hash)?;
     
         Ok(())
     }
@@ -52,7 +53,7 @@ impl Tag {
             Ok(data) => data,
             Err(_) => return Err(Error::BadKVLMFormat),
         };
-        let map = crate::kvlm::kvlm_parse(&data)?;
+        let map = crate::kvlm::parse(&data)?;
 
         Ok(Tag {
             map,
@@ -60,7 +61,7 @@ impl Tag {
     }
 
     pub fn serialize(&self) -> Vec<u8> {
-        crate::kvlm::kvlm_serialize(&self.map).into_bytes()
+        crate::kvlm::serialize(&self.map).into_bytes()
     }
 
     pub fn serialize_into(self) -> Vec<u8> {
