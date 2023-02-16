@@ -15,7 +15,6 @@ use crate::{
         ObjectHash,
         ObjectFormat,
         Commit,
-        Tree,
         Tag,
     },
     refs::ref_list,
@@ -80,12 +79,7 @@ pub struct AddArgs {
 
 pub fn cmd_add(args: AddArgs) -> Result<()> {
     let repo = GitRepository::find(".")?;
-    let mut index = {
-        let index_file = repo.open_file("index", None)?;
-        let mut buf_reader = std::io::BufReader::new(index_file);
-
-        Index::parse(&mut buf_reader)?
-    };
+    let mut index = Index::from_repo(&repo)?;
 
     if !index.ext_data.is_empty() {
         eprintln!("Warning: index contains unsupported extensions.");
@@ -197,12 +191,7 @@ pub struct CommitArgs {
 
 pub fn cmd_commit(_args: CommitArgs) -> Result<()> {
     let repo = GitRepository::find(".")?;
-    let index = {
-        let index_file = repo.open_file("index", None)?;
-        let mut buf_reader = std::io::BufReader::new(index_file);
-
-        Index::parse(&mut buf_reader)?
-    };
+    let index = Index::from_repo(&repo)?;
 
     let hash = Commit::create(&index, &repo)?;
     println!("{hash}");
@@ -304,13 +293,8 @@ pub struct LsFilesArgs {
 }
 
 pub fn cmd_ls_files(_args: LsFilesArgs) -> Result<()> {
-    let index = {
-        let repo = GitRepository::find(".")?;
-        let index_file = repo.open_file("index", None)?;
-        let mut buf_reader = std::io::BufReader::new(index_file);
-
-        Index::parse(&mut buf_reader)?
-    };
+    let repo = GitRepository::find(".")?;
+    let index = Index::from_repo(&repo)?;
 
     if !index.ext_data.is_empty() {
         eprintln!("Warning: index contains unsupported extensions.");

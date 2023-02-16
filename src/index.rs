@@ -39,10 +39,16 @@ pub struct Index {
     pub ext_data: Vec<u8>,
 }
 
-
 impl Index {
     const INDEX_SIGNATURE: [u8; 4] = [b'D', b'I', b'R', b'C'];
-    
+
+    pub fn from_repo(repo: &GitRepository) -> Result<Index> {
+        let file = repo.open_file("index", None)?;
+        let mut buf_reader = std::io::BufReader::new(file);
+        
+        Self::parse(&mut buf_reader)
+    }
+
     pub fn parse<R>(reader: &mut R) -> Result<Index>
     where
         R: BufRead + Seek
