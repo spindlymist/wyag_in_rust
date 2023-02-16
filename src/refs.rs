@@ -7,7 +7,7 @@ use std::{
 use crate::{
     Error,
     Result,
-    repo::{GitRepository, repo_path},
+    repo::GitRepository,
     object::ObjectHash,
 };
 
@@ -15,7 +15,7 @@ pub fn ref_create<P>(repo: &GitRepository, ref_name: P, ref_hash: &ObjectHash) -
 where
     P: AsRef<Path>
 {
-    let ref_path = repo_path(repo, PathBuf::from("refs").join(ref_name));
+    let ref_path = repo.path(PathBuf::from("refs").join(ref_name));
     fs::write(ref_path, format!("{ref_hash}\n"))?;
 
     Ok(())
@@ -25,7 +25,7 @@ pub fn ref_resolve<P>(repo: &GitRepository, ref_path: P) -> Result<ObjectHash>
 where
     P: AsRef<Path>
 {
-    let ref_path = repo_path(repo, ref_path);
+    let ref_path = repo.path(ref_path);
     let ref_contents = match fs::read_to_string(ref_path) {
         Ok(val) => val,
         Err(err) => match err.kind() {
@@ -45,7 +45,7 @@ where
 
 pub fn ref_list(repo: &GitRepository) -> Result<Vec<(String, ObjectHash)>> {
     let prev_working_dir = std::env::current_dir()?;
-    std::env::set_current_dir(repo_path(repo, "."))?;
+    std::env::set_current_dir(repo.path("."))?;
 
     let mut refs = Vec::new();
     ref_list_recursive(repo, "refs", &mut refs)?;

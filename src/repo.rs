@@ -53,23 +53,23 @@ impl GitRepository {
             config,
         };
         
-        repo_make_dir(&repo, "branches")?;
-        repo_make_dir(&repo, "objects")?;
-        repo_make_dir(&repo, "refs/tags")?;
-        repo_make_dir(&repo, "refs/heads")?;
+        repo.make_dir("branches")?;
+        repo.make_dir("objects")?;
+        repo.make_dir("refs/tags")?;
+        repo.make_dir("refs/heads")?;
 
         let mut options = OpenOptions::new();
         options
             .create(true)
             .append(true);
 
-        let mut description_file = repo_open_file(&repo, "description", Some(&options))?;
+        let mut description_file = repo.open_file("description", Some(&options))?;
         description_file.write_all(b"Unnamed repository; edit this file 'description' to name the repository.\n")?;
 
-        let mut head_file = repo_open_file(&repo, "HEAD", Some(&options))?;
+        let mut head_file = repo.open_file("HEAD", Some(&options))?;
         head_file.write_all(b"ref: refs/heads/master\n")?;
 
-        let mut config_file = repo_open_file(&repo, "config", Some(&options))?;
+        let mut config_file = repo.open_file("config", Some(&options))?;
         repo.config.write_to(&mut config_file)?;
 
         Ok(repo)
@@ -104,90 +104,91 @@ impl GitRepository {
             config,
         })
     }
-}
-
-pub fn repo_canonicalize<P>(repo: &GitRepository, path: P) -> Result<String>
-where
-    P: AsRef<Path>
-{
-    let abs_path = path.as_ref().absolutize()?;
-
-    let mut name = match abs_path.strip_prefix(&repo.working_dir) {
-        Ok(path) => path.to_string_lossy().replace('\\', "/"),
-        Err(_) => return Err(Error::InvalidPath),
-    };
-
-    if name.ends_with('/') {
-        name.truncate(name.len() - 1);
-    }
-
-    Ok(name)
-}
-
-pub fn repo_path<P>(repo: &GitRepository, rel_path: P) -> PathBuf
-where
-    P: AsRef<Path>
-{
-    repo.git_dir.join(rel_path)
-}
-
-pub fn repo_working_path<P>(repo: &GitRepository, rel_path: P) -> PathBuf
-where
-    P: AsRef<Path>
-{
-    repo.working_dir.join(rel_path)
-}
-
-pub fn repo_open_file<P>(repo: &GitRepository, rel_path: P, options: Option<&OpenOptions>) -> Result<File>
-where
-    P: AsRef<Path>
-{    
-    if let Some(parent_path) = rel_path.as_ref().parent() {
-        repo_make_dir(repo, parent_path)?;
-    }
     
-    let abs_path = repo_path(repo, rel_path);
+    pub fn canonicalize_path<P>(&self, path: P) -> Result<String>
+    where
+        P: AsRef<Path>
+    {
+        let abs_path = path.as_ref().absolutize()?;
 
-    if let Some(options) = options {
-        Ok(options.open(abs_path)?)
-    }
-    else {
-        Ok(File::open(abs_path)?)
-    }
-}
+        let mut name = match abs_path.strip_prefix(&self.working_dir) {
+            Ok(path) => path.to_string_lossy().replace('\\', "/"),
+            Err(_) => return Err(Error::InvalidPath),
+        };
 
-pub fn repo_make_dir<P>(repo: &GitRepository, rel_path: P) -> Result<PathBuf>
-where
-    P: AsRef<Path>
-{
-    let abs_path = repo_path(repo, rel_path);
+        if name.ends_with('/') {
+            name.truncate(name.len() - 1);
+        }
 
-    if !abs_path.is_dir() {
-        fs::create_dir_all(&abs_path)?;
-    }
-    
-    Ok(abs_path)
-}
-
-/// Finds the git repository that contains `path` (if it exists).
-pub fn repo_find<P>(path: P) -> Result<GitRepository>
-where
-    P: AsRef<Path>
-{
-    let abs_path = path.as_ref().absolutize()?;
-
-    // The existence of a .git directory is considered sufficient
-    // evidence of a repository
-    if abs_path.join(".git").is_dir() {
-        return GitRepository::from_dir(&abs_path);
+        Ok(name)
     }
 
-    // Recurse up the directory tree
-    if let Some(parent_path) = abs_path.parent() {
-        repo_find(parent_path)
+    pub fn path<P>(&self, rel_path: P) -> PathBuf
+    where
+        P: AsRef<Path>
+    {
+        self.git_dir.join(rel_path)
     }
-    else {
-        // Reached root without finding a .git directory
-        Err(Error::DirectoryNotInitialized)
+
+    pub fn working_path<P>(&self, rel_path: P) -> PathBuf
+    where
+        P: AsRef<Path>
+    {
+        self.working_dir.join(rel_path)
     }
+
+    pub fn open_file<P>(&self, rel_path: P, options: Option<&OpenOptions>) -> Result<File>
+    where
+        P: AsRef<Path>
+    {    
+        if let Some(parent_path) = rel_path.as_ref().parent() {
+            self.make_dir(parent_path)?;
+        }
+        
+        let abs_path = self.path(rel_path);
+
+        if let Some(options) = options {
+            Ok(options.open(abs_path)?)
+        }
+        else {
+            Ok(File::open(abs_path)?)
+        }
+    }
+
+    pub fn make_dir<P>(&self, rel_path: P) -> Result<PathBuf>
+    where
+        P: AsRef<Path>
+    {
+        let abs_path = self.path(rel_path);
+
+        if !abs_path.is_dir() {
+            fs::create_dir_all(&abs_path)?;
+        }
+        
+        Ok(abs_path)
+    }
+
+    /// Finds the git repository that contains `path` (if it exists).
+    pub fn find<P>(path: P) -> Result<GitRepository>
+    where
+        P: AsRef<Path>
+    {
+        let abs_path = path.as_ref().absolutize()?;
+
+        // The existence of a .git directory is considered sufficient
+        // evidence of a repository
+        if abs_path.join(".git").is_dir() {
+            return GitRepository::from_dir(&abs_path);
+        }
+
+        // Recurse up the directory tree
+        if let Some(parent_path) = abs_path.parent() {
+            GitRepository::find(parent_path)
+        }
+        else {
+            // Reached root without finding a .git directory
+            Err(Error::DirectoryNotInitialized)
+        }
+    }
+
 }

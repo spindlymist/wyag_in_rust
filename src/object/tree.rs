@@ -1,7 +1,7 @@
 use std::{path::Path, collections::HashSet};
 
 use crate::{Error, Result, repo::GitRepository, index::Index};
-use super::{ObjectHash, object_read, GitObject, object_write};
+use super::{ObjectHash, GitObject};
 
 pub struct Tree {
     pub entries: Vec<TreeEntry>,
@@ -14,6 +14,73 @@ pub struct TreeEntry {
 }
 
 impl Tree {
+    pub fn checkout<P>(&self, repo: &GitRepository, path: P) -> Result<()>
+    where
+        P: AsRef<Path>
+    {
+        for entry in &self.entries {
+            let object_path = path.as_ref().join(&entry.name);
+
+            match GitObject::read(repo, &entry.hash)? {
+                GitObject::Blob(blob) => {
+                    std::fs::write(object_path, blob.serialize_into())?;
+                },
+                GitObject::Tree(tree) => {
+                    std::fs::create_dir(&object_path)?;
+                    tree.checkout(repo, object_path)?;
+                },
+                _ => return Err(Error::BadTreeFormat),
+            };
+        }
+
+        Ok(())
+    }
+
+    pub fn create_from_index(index: &Index, repo: &GitRepository) -> Result<ObjectHash> {
+        Self::make_subtree(index, repo, "")
+    }
+
+    fn make_subtree(index: &Index, repo: &GitRepository, prefix: &str) -> Result<ObjectHash> {
+        let mut entries = vec![];
+        let mut prefixes_handled: HashSet<&str> = HashSet::new();
+
+        for (name, index_entry) in &index.entries {
+            if let Some(suffix) = name.strip_prefix(prefix) {
+                if let Some(slash_idx) = suffix.find('/') {
+                    let new_prefix = &name[..=prefix.len() + slash_idx];
+
+                    if prefixes_handled.contains(new_prefix) {
+                        continue;
+                    }
+                    else {
+                        prefixes_handled.insert(new_prefix);
+                    }
+
+                    let subtree_hash = Self::make_subtree(index, repo, new_prefix)?;
+                    let tree_entry = TreeEntry {
+                        mode: "040000".to_owned(),
+                        name: String::from(&suffix[..slash_idx]),
+                        hash: subtree_hash,
+                    };
+                    entries.push(tree_entry);
+                }
+                else {
+                    let tree_entry = TreeEntry {
+                        mode: index_entry.stats.get_mode_string(),
+                        name: String::from(suffix),
+                        hash: index_entry.hash,
+                    };
+                    entries.push(tree_entry);
+                }
+            }
+        }
+
+        let tree = GitObject::Tree(Tree { entries });
+        let hash = tree.write(repo)?;
+
+        Ok(hash)
+    }
+
     pub fn deserialize(data: Vec<u8>) -> Result<Tree> {
         let mut entries = vec![];
         let mut iter = data.into_iter();
@@ -67,71 +134,4 @@ impl Tree {
     pub fn serialize_into(self) -> Vec<u8> {
         self.serialize()
     }
-}
-
-pub fn tree_checkout<P>(repo: &GitRepository, tree: &Tree, path: P) -> Result<()>
-where
-    P: AsRef<Path>
-{
-    for entry in &tree.entries {
-        let object_path = path.as_ref().join(&entry.name);
-
-        match object_read(repo, &entry.hash)? {
-            GitObject::Blob(blob) => {
-                std::fs::write(object_path, blob.serialize_into())?;
-            },
-            GitObject::Tree(tree) => {
-                std::fs::create_dir(&object_path)?;
-                tree_checkout(repo, &tree, object_path)?;
-            },
-            _ => return Err(Error::BadTreeFormat),
-        };
-    }
-
-    Ok(())
-}
-
-pub fn tree_create_from_index(index: &Index, repo: &GitRepository) -> Result<ObjectHash> {
-    make_subtree(index, repo, "")
-}
-
-fn make_subtree(index: &Index, repo: &GitRepository, prefix: &str) -> Result<ObjectHash> {
-    let mut entries = vec![];
-    let mut prefixes_handled: HashSet<&str> = HashSet::new();
-
-    for (name, index_entry) in &index.entries {
-        if let Some(suffix) = name.strip_prefix(prefix) {
-            if let Some(slash_idx) = suffix.find('/') {
-                let new_prefix = &name[..=prefix.len() + slash_idx];
-
-                if prefixes_handled.contains(new_prefix) {
-                    continue;
-                }
-                else {
-                    prefixes_handled.insert(new_prefix);
-                }
-
-                let subtree_hash = make_subtree(index, repo, new_prefix)?;
-                let tree_entry = TreeEntry {
-                    mode: "040000".to_owned(),
-                    name: String::from(&suffix[..slash_idx]),
-                    hash: subtree_hash,
-                };
-                entries.push(tree_entry);
-            }
-            else {
-                let tree_entry = TreeEntry {
-                    mode: index_entry.stats.get_mode_string(),
-                    name: String::from(suffix),
-                    hash: index_entry.hash,
-                };
-                entries.push(tree_entry);
-            }
-        }
-    }
-
-    let tree = GitObject::Tree(Tree { entries });
-    let hash = object_write(repo, &tree)?;
-
-    Ok(hash)
 }

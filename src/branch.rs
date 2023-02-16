@@ -4,7 +4,7 @@ use crate::{
     Error,
     Result,
     refs::{ref_resolve, ref_create},
-    repo::{GitRepository, repo_path},
+    repo::GitRepository,
     object::{ObjectHash}
 };
 
@@ -14,7 +14,7 @@ pub enum Branch {
 }
 
 pub fn branch_get_current(repo: &GitRepository) -> Result<Branch> {
-    let head_path = repo_path(repo, "HEAD");
+    let head_path = repo.path("HEAD");
     let head_contents = fs::read_to_string(head_path)?;
     let head_contents = head_contents.trim();
 
@@ -63,7 +63,7 @@ pub fn branch_update_current(repo: &GitRepository, commit_hash: &ObjectHash) -> 
             branch_update(&branch_name, repo, commit_hash)?;
         },
         Branch::Headless(_) => {
-            let head_path = repo_path(repo, "HEAD");
+            let head_path = repo.path("HEAD");
             std::fs::write(head_path, format!("{commit_hash}\n"))?;
         },
     };
