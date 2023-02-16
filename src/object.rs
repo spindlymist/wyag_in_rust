@@ -36,6 +36,7 @@ pub enum GitObject {
 }
 
 impl GitObject {
+    /// Returns the format (blob, commit, tag, or tree) of the object.
     pub fn get_format(&self) -> ObjectFormat {
         match self {
             GitObject::Blob(_) => ObjectFormat::Blob,
@@ -45,6 +46,7 @@ impl GitObject {
         }
     }
 
+    /// Converts the object into a sequence of bytes.
     pub fn serialize(&self) -> Vec<u8> {
         match self {
             GitObject::Blob(inner) => inner.serialize(),
@@ -54,6 +56,7 @@ impl GitObject {
         }
     }
 
+    /// Converts the object into a sequence of bytes.
     pub fn serialize_into(self) -> Vec<u8> {
         match self {
             GitObject::Blob(inner) => inner.serialize_into(),
@@ -63,6 +66,7 @@ impl GitObject {
         }
     }
 
+    /// Constructs a `GitObject` from a sequence of bytes.
     pub fn deserialize(data: Vec<u8>, format: ObjectFormat) -> Result<GitObject> {
         Ok(match format {
             ObjectFormat::Blob => GitObject::Blob(Blob::deserialize(data)?),
@@ -72,6 +76,7 @@ impl GitObject {
         })
     }
 
+    /// Reads and deserializes the object stored at `path`.
     pub fn from_path<P>(path: P, format: ObjectFormat) -> Result<GitObject>
     where
         P: AsRef<Path>
@@ -79,6 +84,7 @@ impl GitObject {
         Self::from_stream(std::fs::File::open(path)?, format)
     }
 
+    /// Constructs a `GitObject` from a byte stream.
     pub fn from_stream<R>(mut stream: R, format: ObjectFormat) -> Result<GitObject>
     where
         R: Read
@@ -89,7 +95,22 @@ impl GitObject {
         Self::deserialize(data, format)
     }
 
-    /// Resolves a `name` to one or more object hashes.
+    /// Finds the object in `repo` uniquely identified by `id`.
+    /// 
+    /// The identifier may be a (possibly abbreviated) hash, a branch name, a tag, or "HEAD".
+    pub fn find(repo: &Repository, id: &str) -> Result<ObjectHash> {
+        let candidates = Self::resolve(repo, id)?;
+
+        match candidates.len() {
+            0 => Err(Error::BadObjectId),
+            1 => Ok(candidates[0]),
+            _ => Err(Error::AmbiguousObjectId(candidates)),
+        }
+    }
+
+    /// Finds all object hashes that `id` could refer to.
+    /// 
+    /// The identifier may be a (possibly abbreviated) hash, a branch name, a tag, or "HEAD".
     fn resolve(repo: &Repository, id: &str) -> Result<Vec<ObjectHash>> {
         let mut candidates = vec![];
 
@@ -136,17 +157,6 @@ impl GitObject {
         Ok(candidates)
     }
 
-    /// Finds the object in `repo` identified by `id`.
-    pub fn find(repo: &Repository, id: &str) -> Result<ObjectHash> {
-        let candidates = Self::resolve(repo, id)?;
-
-        match candidates.len() {
-            0 => Err(Error::BadObjectId),
-            1 => Ok(candidates[0]),
-            _ => Err(Error::AmbiguousObjectId(candidates)),
-        }
-    }
-
     /// Read the object that hashes to `hash` from `repo`.
     pub fn read(repo: &Repository, hash: &ObjectHash) -> Result<GitObject> {
         let mut buf = Vec::new(); // TODO perhaps reserve some capacity here?
@@ -162,26 +172,30 @@ impl GitObject {
         let mut iter = buf.into_iter();
 
         // Parse header "<format> <size>\0" where
-        //     <format> is one of those accepted by GitObject::deserialize()
+        //     <format> is blob, commit, tag, or tree
         //     <size> is in ASCII base 10
-        let header: Vec<u8> =
-            iter.by_ref()
-            .take_while(|ch| *ch != 0)
-            .collect();
+        let (format, size) = {
+            let header: Vec<u8> =
+                iter.by_ref()
+                .take_while(|ch| *ch != 0)
+                .collect();
 
-        let header = match str::from_utf8(&header) {
-            Ok(val) => val,
-            Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: couldn't parse header"))),
-        };
+            let header = match str::from_utf8(&header) {
+                Ok(val) => val,
+                Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: couldn't parse header"))),
+            };
 
-        let (format, size) = match header.split_once(' ') {
-            Some((left, right)) => (ObjectFormat::try_from(left)?, right),
-            None => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: not enough parts"))),
-        };
+            let (format, size) = match header.split_once(' ') {
+                Some((left, right)) => (ObjectFormat::try_from(left)?, right),
+                None => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: not enough parts"))),
+            };
 
-        let size = match str::parse(size) {
-            Ok(val) => val,
-            Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: invalid length"))),
+            let size = match str::parse(size) {
+                Ok(val) => val,
+                Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: invalid length"))),
+            };
+
+            (format, size)
         };
 
         // Validate size
@@ -193,36 +207,48 @@ impl GitObject {
         Self::deserialize(data, format)
     }
 
+    /// Computes the hash for this object.
     pub fn hash(&self) -> ObjectHash {
         let (hash, _) = self.prepare_for_storage();
 
         hash
     }
 
+    /// Store the object in `repo`.
     pub fn write(&self, repo: &Repository) -> Result<ObjectHash> {
         let (hash, data) = self.prepare_for_storage();
 
-        let mut options = std::fs::OpenOptions::new();
-        options
-            .create(true)
-            .write(true)
-            .truncate(true);
-        let path = PathBuf::from("objects").join(hash.to_path());
-        let object_file = repo.open_git_file(path, Some(&options))?;
+        let object_file = {
+            let mut options = std::fs::OpenOptions::new();
+            options
+                .create(true)
+                .write(true)
+                .truncate(true);
+            let path = PathBuf::from("objects").join(hash.to_path());
 
-        const COMPRESSION_LEVEL: u32 = 6;
-        let mut encoder = ZlibEncoder::new(object_file, flate2::Compression::new(COMPRESSION_LEVEL));
-        encoder.write_all(&data)?;
+            repo.open_git_file(path, Some(&options))?
+        };
+
+        // Compress and write to disk
+        {
+            const COMPRESSION_LEVEL: u32 = 6;
+            let mut encoder = ZlibEncoder::new(object_file, flate2::Compression::new(COMPRESSION_LEVEL));
+            encoder.write_all(&data)?;
+        }
 
         Ok(hash)
     }
 
+    /// Transforms the object to its stored form and computes the hash.
     fn prepare_for_storage(&self) -> (ObjectHash, Vec<u8>) {
         let body = self.serialize();
 
-        let format = self.get_format();
-        let size = body.len();
-        let mut data = format!("{format} {size}\0").into_bytes();
+        let mut data = {
+            let format = self.get_format();
+            let size = body.len();
+
+            format!("{format} {size}\0").into_bytes()
+        };
         data.extend(body);
 
         let hash = ObjectHash::new(&data);
