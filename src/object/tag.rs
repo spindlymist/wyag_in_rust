@@ -7,7 +7,7 @@ use ordered_multimap::ListOrderedMultimap;
 use crate::{
     Error,
     Result,
-    repo::GitRepository,
+    repo::Repository,
     refs,
 };
 
@@ -18,7 +18,7 @@ pub struct Tag {
 }
 
 impl Tag {
-    pub fn create(repo: &GitRepository, name: &str, hash: &ObjectHash) -> Result<Tag>
+    pub fn create(repo: &Repository, name: &str, hash: &ObjectHash) -> Result<Tag>
     {
         let mut map = ListOrderedMultimap::new();
     
@@ -41,7 +41,7 @@ impl Tag {
         }
     }
     
-    pub fn create_lightweight(repo: &GitRepository, name: &str, hash: &ObjectHash) -> Result<()>
+    pub fn create_lightweight(repo: &Repository, name: &str, hash: &ObjectHash) -> Result<()>
     {
         refs::create(repo, PathBuf::from("tags").join(name), hash)?;
     

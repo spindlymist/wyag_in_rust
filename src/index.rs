@@ -11,7 +11,7 @@ use crate::{
     Error,
     Result,
     object::{ObjectHash, GitObject, ObjectFormat},
-    repo::GitRepository,
+    repo::Repository,
 };
 
 pub mod flags;
@@ -42,10 +42,10 @@ pub struct Index {
 impl Index {
     const INDEX_SIGNATURE: [u8; 4] = [b'D', b'I', b'R', b'C'];
 
-    pub fn from_repo(repo: &GitRepository) -> Result<Index> {
-        let file = repo.open_file("index", None)?;
+    pub fn from_repo(repo: &Repository) -> Result<Index> {
+        let file = repo.open_git_file("index", None)?;
         let mut buf_reader = std::io::BufReader::new(file);
-        
+
         Self::parse(&mut buf_reader)
     }
 
@@ -253,7 +253,7 @@ impl Index {
         HEADER_SIZE + (ENTRY_MIN_SIZE * self.entries.len())
     }
 
-    pub fn add<P>(&mut self, repo: &GitRepository, path: P) -> Result<()>
+    pub fn add<P>(&mut self, repo: &Repository, path: P) -> Result<()>
     where
         P: AsRef<Path>
     {
@@ -263,7 +263,7 @@ impl Index {
         Ok(())
     }
 
-    fn prune_deleted_files<P>(&mut self, repo: &GitRepository, path: P) -> Result<()>
+    fn prune_deleted_files<P>(&mut self, repo: &Repository, path: P) -> Result<()>
     where
         P: AsRef<Path>
     {
@@ -281,7 +281,7 @@ impl Index {
         Ok(())
     }
 
-    fn add_path<P>(&mut self, repo: &GitRepository, path: P) -> Result<()>
+    fn add_path<P>(&mut self, repo: &Repository, path: P) -> Result<()>
     where
         P: AsRef<Path>
     {
@@ -302,7 +302,7 @@ impl Index {
         }
     }
 
-    fn add_file<P>(&mut self, repo: &GitRepository, path: P) -> Result<()>
+    fn add_file<P>(&mut self, repo: &Repository, path: P) -> Result<()>
     where
         P: AsRef<Path>
     {
@@ -344,13 +344,13 @@ impl Index {
         Ok(())
     }
 
-    pub fn write(&self, repo: &GitRepository) -> Result<()> {
+    pub fn write(&self, repo: &Repository) -> Result<()> {
         let data = self.serialize()?;
         let mut options = OpenOptions::new();
         options.write(true)
             .create(true)
             .truncate(true);
-        let mut index_file = repo.open_file("index", Some(&options))?;
+        let mut index_file = repo.open_git_file("index", Some(&options))?;
         index_file.write_all(&data)?;
 
         Ok(())

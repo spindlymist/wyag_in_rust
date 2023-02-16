@@ -3,7 +3,7 @@ use ordered_multimap::ListOrderedMultimap;
 use crate::{
     Error,
     Result,
-    repo::GitRepository,
+    repo::Repository,
     index::Index,
     branch,
 };
@@ -15,7 +15,7 @@ pub struct Commit {
 }
 
 impl Commit {
-    pub fn create(index: &Index, repo: &GitRepository) -> Result<ObjectHash> {
+    pub fn create(index: &Index, repo: &Repository) -> Result<ObjectHash> {
         let tree_hash = Tree::create_from_index(index, repo)?;
         let parent_hash = GitObject::find(repo, "HEAD")?;
     

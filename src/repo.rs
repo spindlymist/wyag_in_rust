@@ -11,71 +11,77 @@ use crate::{
     Result,
 };
 
-pub struct GitRepository {
+pub struct Repository {
     working_dir: PathBuf,
     git_dir: PathBuf,
     config: Ini,
 }
 
-impl GitRepository {
-    pub fn init<P>(dir: P) -> Result<GitRepository>
+impl Repository {
+    /// Initializes a new git repository in an empty directory.
+    pub fn init<P>(dir: P) -> Result<Repository>
     where
         P: AsRef<Path>
     {
-        let working_dir = dir.as_ref().absolutize()?.to_path_buf();
+        let repo = {
+            let working_dir = dir.as_ref().absolutize()?.to_path_buf();
 
-        if working_dir.is_file() {
-            return Err(Error::InitPathIsFile);
-        }
-        else if working_dir.is_dir() {
-            match working_dir.read_dir() {
-                Ok(mut files) => {
-                    if files.next().is_some() {
-                        return Err(Error::InitDirectoryNotEmpty);
-                    }
-                },
-                Err(err) => return Err(err.into()),
-            };
-        }
+            // Validate working directory
+            if working_dir.is_file() {
+                return Err(Error::InitPathIsFile);
+            }
+            else if working_dir.is_dir() {
+                let mut files = working_dir.read_dir()?;
+                if files.next().is_some() {
+                    return Err(Error::InitDirectoryNotEmpty);
+                }
+            }
+            
+            let git_dir = working_dir.join(".git");
+            
+            // Initialize config
+            let mut config = Ini::new();
+            config.with_section(Some("core"))
+                .set("repositoryformatversion", "0")
+                .set("filemode", "false")
+                .set("bare", "false");
         
-        let git_dir = working_dir.join(".git");
-        fs::create_dir_all(&git_dir)?;
-
-        let mut config = Ini::new();
-        config.with_section(Some("core"))
-            .set("repositoryformatversion", "0")
-            .set("filemode", "false")
-            .set("bare", "false");
-
-        let repo = GitRepository {
-            working_dir,
-            git_dir,
-            config,
+            Repository {
+                working_dir,
+                git_dir,
+                config,
+            }
         };
         
-        repo.make_dir("branches")?;
-        repo.make_dir("objects")?;
-        repo.make_dir("refs/tags")?;
-        repo.make_dir("refs/heads")?;
+        // Create directories
+        fs::create_dir_all(&repo.git_dir)?;
+        repo.make_git_dir("branches")?;
+        repo.make_git_dir("objects")?;
+        repo.make_git_dir("refs/tags")?;
+        repo.make_git_dir("refs/heads")?;
 
-        let mut options = OpenOptions::new();
-        options
-            .create(true)
-            .append(true);
+        // Create files
+        {
+            let mut options = OpenOptions::new();
+            options
+                .create(true)
+                .append(true);
 
-        let mut description_file = repo.open_file("description", Some(&options))?;
-        description_file.write_all(b"Unnamed repository; edit this file 'description' to name the repository.\n")?;
+            repo.open_git_file("description", Some(&options))?
+                .write_all(b"Unnamed repository; edit this file 'description' to name the repository.\n")?;
 
-        let mut head_file = repo.open_file("HEAD", Some(&options))?;
-        head_file.write_all(b"ref: refs/heads/master\n")?;
+            repo.open_git_file("HEAD", Some(&options))?
+                .write_all(b"ref: refs/heads/master\n")?;
 
-        let mut config_file = repo.open_file("config", Some(&options))?;
-        repo.config.write_to(&mut config_file)?;
+            let mut config_file = repo.open_git_file("config", Some(&options))?;
+            repo.config.write_to(&mut config_file)?;
+        }
 
         Ok(repo)
     }
 
-    pub fn from_dir<P>(dir: P) -> Result<GitRepository>
+    /// Constructs a `Repository` from the repo in an existing directory.
+    pub fn from_existing<P>(dir: P) -> Result<Repository>
     where
         P: AsRef<Path>
     {
@@ -94,17 +100,21 @@ impl GitRepository {
 
         match config.get_from(Some("core"), "repositoryformatversion") {
             Some("0") => (),
-            Some(version) => return Err(Error::UnsupportedRepoFmtVersion(String::from(version))),
+            Some(version) => return Err(Error::UnsupportedRepoFmtVersion(version.to_owned())),
             None => return Err(Error::RepoFmtVersionMissing),
         };
 
-        Ok(GitRepository {
+        Ok(Repository {
             working_dir,
             git_dir,
             config,
         })
     }
     
+    /// Translates a path within the repo to its canonical name.
+    /// 
+    /// The canonical name is relative to the working directory, uses `/` for the path separator,
+    /// and does not begin or end with a slash.
     pub fn canonicalize_path<P>(&self, path: P) -> Result<String>
     where
         P: AsRef<Path>
@@ -123,13 +133,15 @@ impl GitRepository {
         Ok(name)
     }
 
-    pub fn path<P>(&self, rel_path: P) -> PathBuf
+    /// Appends a relative path to the repo's .git directory.
+    pub fn git_path<P>(&self, rel_path: P) -> PathBuf
     where
         P: AsRef<Path>
     {
         self.git_dir.join(rel_path)
     }
 
+    /// Appends a relative path to the repo's working directory.
     pub fn working_path<P>(&self, rel_path: P) -> PathBuf
     where
         P: AsRef<Path>
@@ -137,15 +149,16 @@ impl GitRepository {
         self.working_dir.join(rel_path)
     }
 
-    pub fn open_file<P>(&self, rel_path: P, options: Option<&OpenOptions>) -> Result<File>
+    /// Opens a file in the repo's .git directory.
+    pub fn open_git_file<P>(&self, rel_path: P, options: Option<&OpenOptions>) -> Result<File>
     where
         P: AsRef<Path>
     {    
         if let Some(parent_path) = rel_path.as_ref().parent() {
-            self.make_dir(parent_path)?;
+            self.make_git_dir(parent_path)?;
         }
         
-        let abs_path = self.path(rel_path);
+        let abs_path = self.git_path(rel_path);
 
         if let Some(options) = options {
             Ok(options.open(abs_path)?)
@@ -155,21 +168,19 @@ impl GitRepository {
         }
     }
 
-    pub fn make_dir<P>(&self, rel_path: P) -> Result<PathBuf>
+    /// Creates a directory in the repo's .git directory.
+    pub fn make_git_dir<P>(&self, rel_path: P) -> Result<PathBuf>
     where
         P: AsRef<Path>
     {
-        let abs_path = self.path(rel_path);
-
-        if !abs_path.is_dir() {
-            fs::create_dir_all(&abs_path)?;
-        }
+        let abs_path = self.git_path(rel_path);
+        fs::create_dir_all(&abs_path)?;
         
         Ok(abs_path)
     }
 
     /// Finds the git repository that contains `path` (if it exists).
-    pub fn find<P>(path: P) -> Result<GitRepository>
+    pub fn find<P>(path: P) -> Result<Repository>
     where
         P: AsRef<Path>
     {
@@ -178,12 +189,12 @@ impl GitRepository {
         // The existence of a .git directory is considered sufficient
         // evidence of a repository
         if abs_path.join(".git").is_dir() {
-            return GitRepository::from_dir(&abs_path);
+            return Repository::from_existing(&abs_path);
         }
 
         // Recurse up the directory tree
         if let Some(parent_path) = abs_path.parent() {
-            GitRepository::find(parent_path)
+            Repository::find(parent_path)
         }
         else {
             // Reached root without finding a .git directory

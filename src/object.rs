@@ -10,7 +10,7 @@ use regex::Regex;
 use crate::{
     Error,
     Result,
-    repo::GitRepository,
+    repo::Repository,
     refs,
 };
 
@@ -90,7 +90,7 @@ impl GitObject {
     }
 
     /// Resolves a `name` to one or more object hashes.
-    fn resolve(repo: &GitRepository, id: &str) -> Result<Vec<ObjectHash>> {
+    fn resolve(repo: &Repository, id: &str) -> Result<Vec<ObjectHash>> {
         let mut candidates = vec![];
 
         // TODO there should be some way to make this regex static
@@ -103,7 +103,7 @@ impl GitObject {
             }
             else {
                 let object_dir_name = &id[..2];
-                let dir = repo.path(PathBuf::from("objects").join(object_dir_name));
+                let dir = repo.git_path(PathBuf::from("objects").join(object_dir_name));
                 if dir.exists() {
                     let hashes: Vec<ObjectHash> = std::fs::read_dir(dir)?
                         .collect::<core::result::Result<Vec<std::fs::DirEntry>, _>>()?
@@ -137,7 +137,7 @@ impl GitObject {
     }
 
     /// Finds the object in `repo` identified by `id`.
-    pub fn find(repo: &GitRepository, id: &str) -> Result<ObjectHash> {
+    pub fn find(repo: &Repository, id: &str) -> Result<ObjectHash> {
         let candidates = Self::resolve(repo, id)?;
 
         match candidates.len() {
@@ -148,13 +148,13 @@ impl GitObject {
     }
 
     /// Read the object that hashes to `hash` from `repo`.
-    pub fn read(repo: &GitRepository, hash: &ObjectHash) -> Result<GitObject> {
+    pub fn read(repo: &Repository, hash: &ObjectHash) -> Result<GitObject> {
         let mut buf = Vec::new(); // TODO perhaps reserve some capacity here?
 
         // Read and decompress
         {
             let path = PathBuf::from("objects").join(hash.to_path());
-            let object_file = repo.open_file(path, None)?;
+            let object_file = repo.open_git_file(path, None)?;
             let mut decoder = ZlibDecoder::new(object_file);
             decoder.read_to_end(&mut buf)?;
         }
@@ -199,7 +199,7 @@ impl GitObject {
         hash
     }
 
-    pub fn write(&self, repo: &GitRepository) -> Result<ObjectHash> {
+    pub fn write(&self, repo: &Repository) -> Result<ObjectHash> {
         let (hash, data) = self.prepare_for_storage();
 
         let mut options = std::fs::OpenOptions::new();
@@ -208,7 +208,7 @@ impl GitObject {
             .write(true)
             .truncate(true);
         let path = PathBuf::from("objects").join(hash.to_path());
-        let object_file = repo.open_file(path, Some(&options))?;
+        let object_file = repo.open_git_file(path, Some(&options))?;
 
         const COMPRESSION_LEVEL: u32 = 6;
         let mut encoder = ZlibEncoder::new(object_file, flate2::Compression::new(COMPRESSION_LEVEL));

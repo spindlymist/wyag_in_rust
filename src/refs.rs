@@ -7,25 +7,25 @@ use std::{
 use crate::{
     Error,
     Result,
-    repo::GitRepository,
+    repo::Repository,
     object::ObjectHash,
 };
 
-pub fn create<P>(repo: &GitRepository, ref_name: P, ref_hash: &ObjectHash) -> Result<()>
+pub fn create<P>(repo: &Repository, ref_name: P, ref_hash: &ObjectHash) -> Result<()>
 where
     P: AsRef<Path>
 {
-    let ref_path = repo.path(PathBuf::from("refs").join(ref_name));
+    let ref_path = repo.git_path(PathBuf::from("refs").join(ref_name));
     fs::write(ref_path, format!("{ref_hash}\n"))?;
 
     Ok(())
 }
 
-pub fn resolve<P>(repo: &GitRepository, ref_path: P) -> Result<ObjectHash>
+pub fn resolve<P>(repo: &Repository, ref_path: P) -> Result<ObjectHash>
 where
     P: AsRef<Path>
 {
-    let ref_path = repo.path(ref_path);
+    let ref_path = repo.git_path(ref_path);
     let ref_contents = match fs::read_to_string(ref_path) {
         Ok(val) => val,
         Err(err) => match err.kind() {
@@ -43,9 +43,9 @@ where
     }
 }
 
-pub fn list(repo: &GitRepository) -> Result<Vec<(String, ObjectHash)>> {
+pub fn list(repo: &Repository) -> Result<Vec<(String, ObjectHash)>> {
     let prev_working_dir = std::env::current_dir()?;
-    std::env::set_current_dir(repo.path("."))?;
+    std::env::set_current_dir(repo.git_path("."))?;
 
     let mut refs = Vec::new();
     list_recursive(repo, "refs", &mut refs)?;
@@ -55,7 +55,7 @@ pub fn list(repo: &GitRepository) -> Result<Vec<(String, ObjectHash)>> {
     Ok(refs)
 }
 
-fn list_recursive<P>(repo: &GitRepository, rel_path: P, refs: &mut Vec<(String, ObjectHash)>) -> Result<()>
+fn list_recursive<P>(repo: &Repository, rel_path: P, refs: &mut Vec<(String, ObjectHash)>) -> Result<()>
 where
     P: AsRef<Path>
 {

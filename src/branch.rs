@@ -4,7 +4,7 @@ use crate::{
     Error,
     Result,
     refs,
-    repo::GitRepository,
+    repo::Repository,
     object::{ObjectHash}
 };
 
@@ -13,8 +13,8 @@ pub enum Branch {
     Headless(ObjectHash),
 }
 
-pub fn get_current(repo: &GitRepository) -> Result<Branch> {
-    let head_path = repo.path("HEAD");
+pub fn get_current(repo: &Repository) -> Result<Branch> {
+    let head_path = repo.git_path("HEAD");
     let head_contents = fs::read_to_string(head_path)?;
     let head_contents = head_contents.trim();
 
@@ -33,7 +33,7 @@ pub fn get_current(repo: &GitRepository) -> Result<Branch> {
     }
 }
 
-pub fn create(name: &str, repo: &GitRepository, commit_hash: &ObjectHash) -> Result<()> {
+pub fn create(name: &str, repo: &Repository, commit_hash: &ObjectHash) -> Result<()> {
     if exists(name, repo)? {
         return Err(Error::BranchAlreadyExists);
     }
@@ -43,11 +43,11 @@ pub fn create(name: &str, repo: &GitRepository, commit_hash: &ObjectHash) -> Res
     Ok(())
 }
 
-pub fn delete(_name: &str, _repo: &GitRepository) -> Result<ObjectHash> {
+pub fn delete(_name: &str, _repo: &Repository) -> Result<ObjectHash> {
     todo!()
 }
 
-pub fn update(name: &str, repo: &GitRepository, commit_hash: &ObjectHash) -> Result<()> {
+pub fn update(name: &str, repo: &Repository, commit_hash: &ObjectHash) -> Result<()> {
     if !exists(name, repo)? {
         return Err(Error::InvalidRef);
     }
@@ -57,13 +57,13 @@ pub fn update(name: &str, repo: &GitRepository, commit_hash: &ObjectHash) -> Res
     Ok(())
 }
 
-pub fn update_current(repo: &GitRepository, commit_hash: &ObjectHash) -> Result<()> {
+pub fn update_current(repo: &Repository, commit_hash: &ObjectHash) -> Result<()> {
     match get_current(repo)? {
         Branch::Named(branch_name) => {
             update(&branch_name, repo, commit_hash)?;
         },
         Branch::Headless(_) => {
-            let head_path = repo.path("HEAD");
+            let head_path = repo.git_path("HEAD");
             std::fs::write(head_path, format!("{commit_hash}\n"))?;
         },
     };
@@ -71,7 +71,7 @@ pub fn update_current(repo: &GitRepository, commit_hash: &ObjectHash) -> Result<
     Ok(())
 }
 
-pub fn exists(name: &str, repo: &GitRepository) -> Result<bool> {
+pub fn exists(name: &str, repo: &Repository) -> Result<bool> {
     match refs::resolve(repo, format!("refs/heads/{name}")) {
         Ok(_) => Ok(true),
         Err(err) => match err {

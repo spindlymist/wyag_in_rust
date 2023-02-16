@@ -9,7 +9,7 @@ use clap::{Parser, Subcommand, Args};
 use crate::{
     Error,
     Result,
-    repo::GitRepository,
+    repo::Repository,
     object::{
         GitObject,
         ObjectHash,
@@ -78,7 +78,7 @@ pub struct AddArgs {
 }
 
 pub fn cmd_add(args: AddArgs) -> Result<()> {
-    let repo = GitRepository::find(".")?;
+    let repo = Repository::find(".")?;
     let mut index = Index::from_repo(&repo)?;
 
     if !index.ext_data.is_empty() {
@@ -102,7 +102,7 @@ pub struct BranchArgs {
 }
 
 pub fn cmd_branch(args: BranchArgs) -> Result<()> {
-    let repo = GitRepository::find(".")?;
+    let repo = Repository::find(".")?;
     if let Some(branch_name) = args.branch_name {
         if args.delete {
             branch::delete(&branch_name, &repo)?;
@@ -133,7 +133,7 @@ pub struct CatFileArgs {
 }
 
 pub fn cmd_cat_file(args: CatFileArgs) -> Result<()> {
-    let repo = GitRepository::find(".")?;
+    let repo = Repository::find(".")?;
     let hash = GitObject::find(&repo, &args.object)?;
     let object = GitObject::read(&repo, &hash)?;
 
@@ -152,7 +152,7 @@ pub struct CheckoutArgs {
 }
 
 pub fn cmd_checkout(args: CheckoutArgs) -> Result<()> {
-    let repo = GitRepository::find(".")?;
+    let repo = Repository::find(".")?;
     let hash = GitObject::find(&repo, &args.commit)?;
     let mut object = GitObject::read(&repo, &hash)?;
     
@@ -190,7 +190,7 @@ pub struct CommitArgs {
 }
 
 pub fn cmd_commit(_args: CommitArgs) -> Result<()> {
-    let repo = GitRepository::find(".")?;
+    let repo = Repository::find(".")?;
     let index = Index::from_repo(&repo)?;
 
     let hash = Commit::create(&index, &repo)?;
@@ -217,7 +217,7 @@ pub struct HashObjectArgs {
 pub fn cmd_hash_object(args: HashObjectArgs) -> Result<()> {
     let object = GitObject::from_path(args.path, args.format.into())?;
     let hash = if args.write {
-        let repo = GitRepository::find(".")?;
+        let repo = Repository::find(".")?;
         object.write(&repo)?
     }
     else {
@@ -238,7 +238,7 @@ pub struct InitArgs {
 
 pub fn cmd_init(args: InitArgs) -> Result<()> {
     let path = args.path.unwrap_or(PathBuf::from("."));
-    GitRepository::init(&path)?;
+    Repository::init(&path)?;
     
     println!("Successfully initialized git repository at {}", path.to_string_lossy());
 
@@ -254,7 +254,7 @@ pub struct LogArgs {
 }
 
 pub fn cmd_log(args: LogArgs) -> Result<()> {
-    let repo = GitRepository::find(".")?;
+    let repo = Repository::find(".")?;
 
     println!("digraph wyaglog{{");
     let hash = GitObject::find(&repo, &args.commit)?;
@@ -264,7 +264,7 @@ pub fn cmd_log(args: LogArgs) -> Result<()> {
     Ok(())
 }
 
-fn log_graphviz(repo: &GitRepository, hash: &ObjectHash, seen: &mut HashSet<ObjectHash>) -> Result<()> {
+fn log_graphviz(repo: &Repository, hash: &ObjectHash, seen: &mut HashSet<ObjectHash>) -> Result<()> {
     if seen.contains(hash) {
         return Ok(());
     }
@@ -293,7 +293,7 @@ pub struct LsFilesArgs {
 }
 
 pub fn cmd_ls_files(_args: LsFilesArgs) -> Result<()> {
-    let repo = GitRepository::find(".")?;
+    let repo = Repository::find(".")?;
     let index = Index::from_repo(&repo)?;
 
     if !index.ext_data.is_empty() {
@@ -315,7 +315,7 @@ pub struct LsTreeArgs {
 }
 
 pub fn cmd_ls_tree(args: LsTreeArgs) -> Result<()> {
-    let repo = GitRepository::find(".")?;
+    let repo = Repository::find(".")?;
     let hash = GitObject::find(&repo, &args.object)?;
     let tree = match GitObject::read(&repo, &hash)? {
         GitObject::Tree(tree) => tree,
@@ -358,7 +358,7 @@ pub struct RevParseArgs {
 }
 
 pub fn cmd_rev_parse(args: RevParseArgs) -> Result<()> {
-    let repo = GitRepository::find(".")?;
+    let repo = Repository::find(".")?;
     let hashes = match GitObject::find(&repo, &args.name) {
         Ok(hash) => vec![hash],
         Err(err) => match err {
@@ -398,7 +398,7 @@ pub struct ShowRefArgs {
 }
 
 pub fn cmd_show_ref(_args: ShowRefArgs) -> Result<()> {
-    let repo = GitRepository::find(".")?;
+    let repo = Repository::find(".")?;
     let refs = refs::list(&repo)?;
 
     for (name, hash) in refs {
@@ -425,7 +425,7 @@ pub struct TagArgs {
 
 pub fn cmd_tag(args: TagArgs) -> Result<()> {
     if let Some(name) = args.name {
-        let repo = GitRepository::find(".")?;
+        let repo = Repository::find(".")?;
         let hash = GitObject::find(&repo, &args.object)?;
 
         if args.annotate {
@@ -436,7 +436,7 @@ pub fn cmd_tag(args: TagArgs) -> Result<()> {
         }
     }
     else {
-        let repo = GitRepository::find(".")?;
+        let repo = Repository::find(".")?;
         let refs = refs::list(&repo)?;
         let tag_names = refs.iter()
             .filter(|(name, _)| name.starts_with("refs/tags/"))
