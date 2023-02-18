@@ -11,6 +11,7 @@ use crate::{
     object::ObjectHash,
 };
 
+/// Creates a new ref called `ref_name` that points to `ref_hash`.
 pub fn create<P>(repo: &Repository, ref_name: P, ref_hash: &ObjectHash) -> Result<()>
 where
     P: AsRef<Path>
@@ -21,6 +22,7 @@ where
     Ok(())
 }
 
+/// Determines the hash pointed to by the ref located at `ref_path`.
 pub fn resolve<P>(repo: &Repository, ref_path: P) -> Result<ObjectHash>
 where
     P: AsRef<Path>
@@ -35,6 +37,7 @@ where
     };
     let ref_contents = ref_contents.trim();
 
+    // This ref may refer to another ref
     if let Some(indirect_ref_path) = ref_contents.strip_prefix("ref: ") {
         resolve(repo, indirect_ref_path)
     }
@@ -43,6 +46,7 @@ where
     }
 }
 
+/// Enumerates all of the refs defined in `repo`.
 pub fn list(repo: &Repository) -> Result<Vec<(String, ObjectHash)>> {
     let prev_working_dir = std::env::current_dir()?;
     std::env::set_current_dir(repo.git_path("."))?;
@@ -55,6 +59,7 @@ pub fn list(repo: &Repository) -> Result<Vec<(String, ObjectHash)>> {
     Ok(refs)
 }
 
+/// Enumerates all of the refs defined in the directory at `rel_path`.
 fn list_recursive<P>(repo: &Repository, rel_path: P, refs: &mut Vec<(String, ObjectHash)>) -> Result<()>
 where
     P: AsRef<Path>
