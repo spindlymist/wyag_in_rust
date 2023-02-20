@@ -15,7 +15,7 @@ use crate::{
         ObjectHash,
         ObjectFormat,
         Commit,
-        Tag,
+        Tag, ObjectMetadata,
     },
     refs,
     index::Index,
@@ -184,16 +184,20 @@ pub fn cmd_checkout(args: CheckoutArgs) -> Result<()> {
     }
 }
 
+/// Commits staged changes to the current branch.
 #[derive(Args)]
 pub struct CommitArgs {
-    
+    /// A message to attach to the tag.
+    #[arg(short, default_value = "")]
+    message: String,
 }
 
-pub fn cmd_commit(_args: CommitArgs) -> Result<()> {
+pub fn cmd_commit(args: CommitArgs) -> Result<()> {
     let repo = Repository::find(".")?;
     let index = Index::from_repo(&repo)?;
+    let meta = ObjectMetadata::new(&repo, args.message)?;
 
-    let hash = Commit::create(&index, &repo)?;
+    let hash = Commit::create(&index, &repo, meta)?;
     println!("{hash}");
 
     Ok(())
@@ -421,21 +425,28 @@ pub struct TagArgs {
     /// The object the new tag will point to.
     #[arg(default_value = "HEAD")]
     object: String,
+
+    /// A message to attach to the tag.
+    #[arg(short, default_value = "")]
+    message: String,
 }
 
 pub fn cmd_tag(args: TagArgs) -> Result<()> {
     if let Some(name) = args.name {
+        // Create a tag
         let repo = Repository::find(".")?;
         let hash = GitObject::find(&repo, &args.object)?;
+        let meta = ObjectMetadata::new(&repo, args.message)?;
 
         if args.annotate {
-            Tag::create(&repo, &name, &hash)?;
+            Tag::create(&repo, &name, &hash, meta)?;
         }
         else {
             Tag::create_lightweight(&repo, &name, &hash)?;
         }
     }
     else {
+        // List existing tags
         let repo = Repository::find(".")?;
         let refs = refs::list(&repo)?;
         let tag_names = refs.iter()

@@ -32,6 +32,7 @@ pub enum Error {
     InvalidRef,
     BranchAlreadyExists,
     UnrecognizedHeadRef,
+    MissingConfig(String),
     Io(io::Error),
     Ini(ini::Error),
 }

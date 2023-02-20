@@ -18,6 +18,7 @@ mod format;
 mod blob;
 mod commit;
 mod hash;
+mod meta;
 mod tag;
 mod tree;
 
@@ -25,6 +26,7 @@ pub use format::ObjectFormat;
 pub use blob::Blob;
 pub use commit::Commit;
 pub use hash::ObjectHash;
+pub use meta::ObjectMetadata;
 pub use tag::Tag;
 pub use tree::Tree;
 
