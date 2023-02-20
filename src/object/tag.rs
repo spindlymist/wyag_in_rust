@@ -1,7 +1,3 @@
-use std::{
-    path::PathBuf,
-};
-
 use ordered_multimap::ListOrderedMultimap;
 
 use crate::{
@@ -43,7 +39,7 @@ impl Tag {
     
     pub fn create_lightweight(repo: &Repository, name: &str, hash: &ObjectHash) -> Result<()>
     {
-        refs::create(repo, PathBuf::from("tags").join(name), hash)?;
+        refs::create(repo, "tags", name, hash)?;
     
         Ok(())
     }

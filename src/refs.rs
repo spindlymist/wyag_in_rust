@@ -11,24 +11,30 @@ use crate::{
     object::ObjectHash,
 };
 
-/// Creates a new ref called `ref_name` that points to `ref_hash`.
-pub fn create<P>(repo: &Repository, ref_name: P, ref_hash: &ObjectHash) -> Result<()>
-where
-    P: AsRef<Path>
+/// Creates a new ref at refs/prefix/name that points to `hash`.
+pub fn create(repo: &Repository, prefix: &str, name: &str, hash: &ObjectHash) -> Result<()>
 {
-    let ref_path = repo.git_path(PathBuf::from("refs").join(ref_name));
-    fs::write(ref_path, format!("{ref_hash}\n"))?;
+    let rel_path: PathBuf = ["refs", prefix, name].iter().collect();
+    let abs_path = repo.git_path(rel_path);
+    fs::write(abs_path, format!("{hash}\n"))?;
 
     Ok(())
 }
 
-/// Determines the hash pointed to by the ref located at `ref_path`.
-pub fn resolve<P>(repo: &Repository, ref_path: P) -> Result<ObjectHash>
+/// Determines the hash pointed to by the ref located at refs/prefix/name.
+pub fn resolve(repo: &Repository, prefix: &str, name: &str) -> Result<ObjectHash>
+{
+    let rel_path: PathBuf = ["refs", prefix, name].iter().collect();
+    resolve_path(repo, rel_path)
+}
+
+/// Determines the hash pointed to by the ref located at `rel_path`.
+pub fn resolve_path<P>(repo: &Repository, rel_path: P) -> Result<ObjectHash>
 where
     P: AsRef<Path>
 {
-    let ref_path = repo.git_path(ref_path);
-    let ref_contents = match fs::read_to_string(ref_path) {
+    let abs_path = repo.git_path(rel_path);
+    let ref_contents = match fs::read_to_string(abs_path) {
         Ok(val) => val,
         Err(err) => match err.kind() {
             io::ErrorKind::NotFound => return Err(Error::InvalidRef),
@@ -38,12 +44,17 @@ where
     let ref_contents = ref_contents.trim();
 
     // This ref may refer to another ref
-    if let Some(indirect_ref_path) = ref_contents.strip_prefix("ref: ") {
-        resolve(repo, indirect_ref_path)
+    if let Some(indirect_path) = ref_contents.strip_prefix("ref: ") {
+        resolve_path(repo, indirect_path)
     }
     else {
         ObjectHash::try_from(ref_contents)
     }
+}
+
+/// Determines the hash pointed to by the HEAD ref of `repo`.
+pub fn head(repo: &Repository) -> Result<ObjectHash> {
+    resolve_path(repo, "HEAD")
 }
 
 /// Enumerates all of the refs defined in `repo`.
@@ -71,10 +82,10 @@ where
             list_recursive(repo, path, refs)?;
         }
         else {
-            let ref_hash = resolve(repo, &path)?;
+            let hash = resolve_path(repo, &path)?;
             refs.push((
                 path.to_string_lossy().replace('\\', "/"),
-                ref_hash,
+                hash,
             ));
         }
     }

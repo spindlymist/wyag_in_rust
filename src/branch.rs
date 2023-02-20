@@ -44,7 +44,7 @@ pub fn create(name: &str, repo: &Repository, commit_hash: &ObjectHash) -> Result
         return Err(Error::BranchAlreadyExists);
     }
 
-    refs::create(repo, format!("heads/{name}"), commit_hash)?;
+    refs::create(repo, "heads", name, commit_hash)?;
 
     Ok(())
 }
@@ -60,7 +60,7 @@ pub fn update(name: &str, repo: &Repository, commit_hash: &ObjectHash) -> Result
         return Err(Error::InvalidRef);
     }
 
-    refs::create(repo, format!("heads/{name}"), commit_hash)?;
+    refs::create(repo, "heads", name, commit_hash)?;
 
     Ok(())
 }
@@ -82,7 +82,7 @@ pub fn update_current(repo: &Repository, commit_hash: &ObjectHash) -> Result<()>
 
 /// Returns true if the branch called `name` exists.
 pub fn exists(name: &str, repo: &Repository) -> Result<bool> {
-    match refs::resolve(repo, format!("refs/heads/{name}")) {
+    match refs::resolve(repo, "heads", name) {
         Ok(_) => Ok(true),
         Err(err) => match err {
             Error::InvalidRef => Ok(false),

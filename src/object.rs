@@ -139,18 +139,18 @@ impl GitObject {
         }
 
         if id == "HEAD" {
-            candidates.push(refs::resolve(repo, "HEAD")?);
+            candidates.push(refs::head(repo)?);
         }
 
-        if let Ok(local_branch) = refs::resolve(repo, PathBuf::from("refs/heads").join(id)) {
+        if let Ok(local_branch) = refs::resolve(repo, "heads", id) {
             candidates.push(local_branch);
         }
 
-        if let Ok(remote_branch) = refs::resolve(repo, PathBuf::from("refs/remotes").join(id)) {
+        if let Ok(remote_branch) = refs::resolve(repo, "remotes", id) {
             candidates.push(remote_branch);
         }
 
-        if let Ok(tag) = refs::resolve(repo, PathBuf::from("refs/tags").join(id)) {
+        if let Ok(tag) = refs::resolve(repo, "tags", id) {
             candidates.push(tag);
         }
 
