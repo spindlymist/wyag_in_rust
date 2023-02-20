@@ -202,4 +202,13 @@ impl Repository {
         }
     }
 
+    pub fn get_config(&self, section: &str, key: &str) -> Option<&str> {
+        // TODO support global config
+        self.config.get_from(Some(section), key)
+    }
+
+    pub fn set_config(&mut self, section: &str, key: &str, value: String) {
+        self.config.set_to(Some(section), key.to_owned(), value)
+    }
+
 }
