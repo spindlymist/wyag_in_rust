@@ -92,3 +92,14 @@ where
 
     Ok(())
 }
+
+pub fn delete(repo: &Repository, prefix: &str, name: &str) -> Result<()> {
+    let rel_path: PathBuf = ["refs", prefix, name].iter().collect();
+    let abs_path = repo.git_path(rel_path);
+
+    if abs_path.is_file() {
+        std::fs::remove_file(abs_path)?;
+    }
+
+    Ok(())
+}

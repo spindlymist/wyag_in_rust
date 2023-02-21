@@ -33,6 +33,8 @@ pub enum Error {
     BranchAlreadyExists,
     UnrecognizedHeadRef,
     MissingConfig(String),
+    BranchIsCheckedOut,
+    BranchPossiblyUnmerged,
     Io(io::Error),
     Ini(ini::Error),
 }
