@@ -44,6 +44,10 @@ impl Tag {
         Ok(())
     }
 
+    pub fn delete(repo: &Repository, name: &str) -> Result<()> {
+        refs::delete(repo, "tags", name)
+    }
+
     pub fn deserialize(data: Vec<u8>) -> Result<Tag> {
         let data = match String::from_utf8(data) {
             Ok(data) => data,

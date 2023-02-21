@@ -412,12 +412,16 @@ pub fn cmd_show_ref(_args: ShowRefArgs) -> Result<()> {
     Ok(())
 }
 
-/// List or create tags.
+/// List, create, or delete tags.
 #[derive(Args)]
 pub struct TagArgs {
     /// Create an annotated tag.
     #[arg(short, long)]
     annotate: bool,
+
+    /// Delete the tag.
+    #[arg(short, long)]
+    delete: bool,
 
     /// The new tag's name.
     name: Option<String>,
@@ -433,16 +437,22 @@ pub struct TagArgs {
 
 pub fn cmd_tag(args: TagArgs) -> Result<()> {
     if let Some(name) = args.name {
-        // Create a tag
         let repo = Repository::find(".")?;
-        let hash = GitObject::find(&repo, &args.object)?;
-        let meta = ObjectMetadata::new(&repo, args.message)?;
 
-        if args.annotate {
-            Tag::create(&repo, &name, &hash, meta)?;
+        if args.delete {
+            Tag::delete(&repo, &name)?;
         }
-        else {
-            Tag::create_lightweight(&repo, &name, &hash)?;
+        else{
+            // Create a tag
+            let hash = GitObject::find(&repo, &args.object)?;
+            let meta = ObjectMetadata::new(&repo, args.message)?;
+
+            if args.annotate {
+                Tag::create(&repo, &name, &hash, meta)?;
+            }
+            else {
+                Tag::create_lightweight(&repo, &name, &hash)?;
+            }
         }
     }
     else {
