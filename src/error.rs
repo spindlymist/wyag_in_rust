@@ -4,7 +4,7 @@ use std::{
     fmt,
 };
 
-use crate::object::ObjectHash;
+use crate::object::{ObjectHash, ObjectFormat};
 
 pub type Result<T> = core::result::Result<T, Error>;
 
@@ -35,6 +35,7 @@ pub enum Error {
     MissingConfig(String),
     BranchIsCheckedOut,
     BranchPossiblyUnmerged,
+    UnexpectedObjectFormat(ObjectFormat),
     Io(io::Error),
     Ini(ini::Error),
 }

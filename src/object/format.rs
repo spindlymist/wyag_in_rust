@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::error::Error;
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum ObjectFormat {
     Blob,
     Commit,

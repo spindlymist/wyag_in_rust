@@ -5,7 +5,7 @@ use crate::{
     Result,
     repo::Repository,
     index::Index,
-    branch,
+    branch, refs,
 };
 
 use super::{Tree, ObjectHash, GitObject, ObjectMetadata};
@@ -16,8 +16,8 @@ pub struct Commit {
 
 impl Commit {
     pub fn create(index: &Index, repo: &Repository, meta: ObjectMetadata) -> Result<ObjectHash> {
-        let tree_hash = Tree::create_from_index(index, repo)?;
-        let parent_hash = GitObject::find(repo, "HEAD")?;
+        let (tree_hash, _) = Tree::create_from_index(index, repo)?;
+        let parent_hash = refs::head(repo)?;
     
         let mut map = ListOrderedMultimap::new();
         map.insert("tree".to_owned(), tree_hash.to_string());
@@ -34,6 +34,13 @@ impl Commit {
         branch::update_current(repo, &commit_hash)?;
     
         Ok(commit_hash)
+    }
+
+    pub fn read(repo: &Repository, hash: &ObjectHash) -> Result<Commit> {
+        match GitObject::read(repo, &hash)? {
+            GitObject::Commit(commit) => Ok(commit),
+            object => Err(Error::UnexpectedObjectFormat(object.get_format())),
+        }
     }
     
     pub fn deserialize(data: Vec<u8>) -> Result<Commit> {

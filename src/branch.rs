@@ -13,6 +13,15 @@ pub enum Branch {
     Headless(ObjectHash),
 }
 
+impl Branch {
+    pub fn tip(&self, repo: &Repository) -> Result<ObjectHash> {
+        match self {
+            Branch::Named(name) => refs::resolve(repo, "heads", name),
+            Branch::Headless(hash) => Ok(*hash)
+        }
+    }
+}
+
 /// Determines the branch pointed to by the HEAD of `repo`.
 pub fn get_current(repo: &Repository) -> Result<Branch> {
     let head_path = repo.git_path("HEAD");

@@ -36,11 +36,11 @@ impl Tree {
         Ok(())
     }
 
-    pub fn create_from_index(index: &Index, repo: &Repository) -> Result<ObjectHash> {
+    pub fn create_from_index(index: &Index, repo: &Repository) -> Result<(ObjectHash, GitObject)> {
         Self::make_subtree(index, repo, "")
     }
 
-    fn make_subtree(index: &Index, repo: &Repository, prefix: &str) -> Result<ObjectHash> {
+    fn make_subtree(index: &Index, repo: &Repository, prefix: &str) -> Result<(ObjectHash, GitObject)> {
         let mut entries = vec![];
         let mut prefixes_handled: HashSet<&str> = HashSet::new();
 
@@ -56,7 +56,7 @@ impl Tree {
                         prefixes_handled.insert(new_prefix);
                     }
 
-                    let subtree_hash = Self::make_subtree(index, repo, new_prefix)?;
+                    let (subtree_hash, _) = Self::make_subtree(index, repo, new_prefix)?;
                     let tree_entry = TreeEntry {
                         mode: "040000".to_owned(),
                         name: String::from(&suffix[..slash_idx]),
@@ -78,7 +78,14 @@ impl Tree {
         let tree = GitObject::Tree(Tree { entries });
         let hash = tree.write(repo)?;
 
-        Ok(hash)
+        Ok((hash, tree))
+    }
+
+    pub fn read(repo: &Repository, hash: &ObjectHash) -> Result<Tree> {
+        match GitObject::read(repo, &hash)? {
+            GitObject::Tree(tree) => Ok(tree),
+            object => Err(Error::UnexpectedObjectFormat(object.get_format())),
+        }
     }
 
     pub fn deserialize(data: Vec<u8>) -> Result<Tree> {
