@@ -3,7 +3,7 @@ use ordered_multimap::ListOrderedMultimap;
 use crate::{
     Error,
     Result,
-    repo::Repository,
+    workdir::WorkDir,
     index::Index,
     branch, refs,
 };
@@ -15,9 +15,9 @@ pub struct Commit {
 }
 
 impl Commit {
-    pub fn create(index: &Index, repo: &Repository, meta: ObjectMetadata) -> Result<ObjectHash> {
-        let (tree_hash, _) = Tree::create_from_index(index, repo)?;
-        let parent_hash = refs::head(repo)?;
+    pub fn create(index: &Index, wd: &WorkDir, meta: ObjectMetadata) -> Result<ObjectHash> {
+        let (tree_hash, _) = Tree::create_from_index(index, wd)?;
+        let parent_hash = refs::head(wd)?;
     
         let mut map = ListOrderedMultimap::new();
         map.insert("tree".to_owned(), tree_hash.to_string());
@@ -29,15 +29,15 @@ impl Commit {
         let commit = GitObject::Commit(Commit {
             map
         });
-        let commit_hash = commit.write(repo)?;
+        let commit_hash = commit.write(wd)?;
     
-        branch::update_current(repo, &commit_hash)?;
+        branch::update_current(wd, &commit_hash)?;
     
         Ok(commit_hash)
     }
 
-    pub fn read(repo: &Repository, hash: &ObjectHash) -> Result<Commit> {
-        match GitObject::read(repo, &hash)? {
+    pub fn read(wd: &WorkDir, hash: &ObjectHash) -> Result<Commit> {
+        match GitObject::read(wd, &hash)? {
             GitObject::Commit(commit) => Ok(commit),
             object => Err(Error::UnexpectedObjectFormat(object.get_format())),
         }

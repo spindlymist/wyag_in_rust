@@ -3,7 +3,7 @@ use ordered_multimap::ListOrderedMultimap;
 use crate::{
     Error,
     Result,
-    repo::Repository,
+    workdir::WorkDir,
     refs,
 };
 
@@ -14,7 +14,7 @@ pub struct Tag {
 }
 
 impl Tag {
-    pub fn create(repo: &Repository, name: &str, hash: &ObjectHash, meta: ObjectMetadata) -> Result<Tag>
+    pub fn create(wd: &WorkDir, name: &str, hash: &ObjectHash, meta: ObjectMetadata) -> Result<Tag>
     {
         let mut map = ListOrderedMultimap::new();
     
@@ -27,9 +27,9 @@ impl Tag {
         let tag_object = GitObject::Tag(Tag {
             map
         });
-        let tag_hash = tag_object.write(repo)?;
+        let tag_hash = tag_object.write(wd)?;
     
-        Self::create_lightweight(repo, name, &tag_hash)?;
+        Self::create_lightweight(wd, name, &tag_hash)?;
     
         match tag_object {
             GitObject::Tag(tag) => Ok(tag),
@@ -37,15 +37,15 @@ impl Tag {
         }
     }
     
-    pub fn create_lightweight(repo: &Repository, name: &str, hash: &ObjectHash) -> Result<()>
+    pub fn create_lightweight(wd: &WorkDir, name: &str, hash: &ObjectHash) -> Result<()>
     {
-        refs::create(repo, "tags", name, hash)?;
+        refs::create(wd, "tags", name, hash)?;
     
         Ok(())
     }
 
-    pub fn delete(repo: &Repository, name: &str) -> Result<()> {
-        refs::delete(repo, "tags", name)
+    pub fn delete(wd: &WorkDir, name: &str) -> Result<()> {
+        refs::delete(wd, "tags", name)
     }
 
     pub fn deserialize(data: Vec<u8>) -> Result<Tag> {

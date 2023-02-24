@@ -28,6 +28,7 @@ pub enum Error {
     AmbiguousObjectId(Vec<ObjectHash>),
     BadIndexFormat(String),
     IndexHasExtensions,
+    HashMismatch,
     InvalidPath,
     InvalidRef,
     BranchAlreadyExists,

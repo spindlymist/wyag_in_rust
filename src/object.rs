@@ -10,7 +10,7 @@ use regex::Regex;
 use crate::{
     Error,
     Result,
-    repo::Repository,
+    workdir::WorkDir,
     refs,
 };
 
@@ -100,8 +100,8 @@ impl GitObject {
     /// Finds the object in `repo` uniquely identified by `id`.
     /// 
     /// The identifier may be a (possibly abbreviated) hash, a branch name, a tag, or "HEAD".
-    pub fn find(repo: &Repository, id: &str) -> Result<ObjectHash> {
-        let candidates = Self::resolve(repo, id)?;
+    pub fn find(wd: &WorkDir, id: &str) -> Result<ObjectHash> {
+        let candidates = Self::resolve(wd, id)?;
 
         match candidates.len() {
             0 => Err(Error::BadObjectId),
@@ -113,7 +113,7 @@ impl GitObject {
     /// Finds all object hashes that `id` could refer to.
     /// 
     /// The identifier may be a (possibly abbreviated) hash, a branch name, a tag, or "HEAD".
-    fn resolve(repo: &Repository, id: &str) -> Result<Vec<ObjectHash>> {
+    fn resolve(wd: &WorkDir, id: &str) -> Result<Vec<ObjectHash>> {
         let mut candidates = vec![];
 
         // TODO there should be some way to make this regex static
@@ -126,7 +126,7 @@ impl GitObject {
             }
             else {
                 let object_dir_name = &id[..2];
-                let dir = repo.git_path(PathBuf::from("objects").join(object_dir_name));
+                let dir = wd.git_path(PathBuf::from("objects").join(object_dir_name));
                 if dir.exists() {
                     let hashes: Vec<ObjectHash> = std::fs::read_dir(dir)?
                         .collect::<core::result::Result<Vec<std::fs::DirEntry>, _>>()?
@@ -141,18 +141,18 @@ impl GitObject {
         }
 
         if id == "HEAD" {
-            candidates.push(refs::head(repo)?);
+            candidates.push(refs::head(wd)?);
         }
 
-        if let Ok(local_branch) = refs::resolve(repo, "heads", id) {
+        if let Ok(local_branch) = refs::resolve(wd, "heads", id) {
             candidates.push(local_branch);
         }
 
-        if let Ok(remote_branch) = refs::resolve(repo, "remotes", id) {
+        if let Ok(remote_branch) = refs::resolve(wd, "remotes", id) {
             candidates.push(remote_branch);
         }
 
-        if let Ok(tag) = refs::resolve(repo, "tags", id) {
+        if let Ok(tag) = refs::resolve(wd, "tags", id) {
             candidates.push(tag);
         }
 
@@ -160,13 +160,13 @@ impl GitObject {
     }
 
     /// Read the object that hashes to `hash` from `repo`.
-    pub fn read(repo: &Repository, hash: &ObjectHash) -> Result<GitObject> {
+    pub fn read(wd: &WorkDir, hash: &ObjectHash) -> Result<GitObject> {
         let mut buf = Vec::new(); // TODO perhaps reserve some capacity here?
 
         // Read and decompress
         {
             let path = PathBuf::from("objects").join(hash.to_path());
-            let object_file = repo.open_git_file(path, None)?;
+            let object_file = wd.open_git_file(path, None)?;
             let mut decoder = ZlibDecoder::new(object_file);
             decoder.read_to_end(&mut buf)?;
         }
@@ -217,7 +217,7 @@ impl GitObject {
     }
 
     /// Store the object in `repo`.
-    pub fn write(&self, repo: &Repository) -> Result<ObjectHash> {
+    pub fn write(&self, wd: &WorkDir) -> Result<ObjectHash> {
         let (hash, data) = self.prepare_for_storage();
 
         let object_file = {
@@ -228,7 +228,7 @@ impl GitObject {
                 .truncate(true);
             let path = PathBuf::from("objects").join(hash.to_path());
 
-            repo.open_git_file(path, Some(&options))?
+            wd.open_git_file(path, Some(&options))?
         };
 
         // Compress and write to disk

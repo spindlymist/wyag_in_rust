@@ -12,6 +12,8 @@ pub mod refs;
 pub mod kvlm;
 pub mod index;
 pub mod branch;
+pub mod diff;
+pub mod workdir;
 
 pub fn run(cli: Cli) {
     let result = match cli.command {

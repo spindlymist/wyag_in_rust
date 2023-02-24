@@ -11,7 +11,7 @@ use crate::{
     Error,
     Result,
     object::{ObjectHash, GitObject, ObjectFormat},
-    repo::Repository,
+    workdir::{WorkDir, WorkPath},
 };
 
 pub mod flags;
@@ -36,7 +36,7 @@ pub struct IndexEntry {
 /// Extensions are not supported.
 pub struct Index {
     pub version: u32,
-    pub entries: BTreeMap<String, IndexEntry>,
+    pub entries: BTreeMap<WorkPath, IndexEntry>,
     pub ext_data: Vec<u8>,
 }
 
@@ -45,8 +45,8 @@ impl Index {
     const INDEX_SIGNATURE: [u8; 4] = [b'D', b'I', b'R', b'C'];
 
     /// Parses the index file in `repo`.
-    pub fn from_repo(repo: &Repository) -> Result<Index> {
-        let file = repo.open_git_file("index", None)?;
+    pub fn from_repo(wd: &WorkDir) -> Result<Index> {
+        let file = wd.open_git_file("index", None)?;
         let mut buf_reader = std::io::BufReader::new(file);
 
         Self::parse(&mut buf_reader)
@@ -280,18 +280,18 @@ impl Index {
     /// 
     /// If `path` is a directory, files in the index that no longer exist
     /// will be removed. Subdirectories will be added recursively.
-    pub fn add<P>(&mut self, repo: &Repository, path: P) -> Result<()>
+    pub fn add<P>(&mut self, wd: &WorkDir, path: P) -> Result<()>
     where
         P: AsRef<Path>
     {
-        self.prune_deleted_files(repo, &path)?;
-        self.add_path(repo, path)?;
+        self.prune_deleted_files(wd, &path)?;
+        self.add_path(wd, path)?;
 
         Ok(())
     }
 
     /// Removes files from the index that no longer exist.
-    fn prune_deleted_files<P>(&mut self, repo: &Repository, path: P) -> Result<()>
+    fn prune_deleted_files<P>(&mut self, wd: &WorkDir, path: P) -> Result<()>
     where
         P: AsRef<Path>
     {
@@ -299,18 +299,18 @@ impl Index {
             return Ok(());
         }
 
-        let dir_name = repo.canonicalize_path(path)?;
+        let dir_name = wd.canonicalize_path(path)?;
 
         self.entries.retain(|name, _| {
             !name.starts_with(&dir_name)
-            || repo.working_path(name).is_file()
+            || wd.working_path(name).is_file()
         });
 
         Ok(())
     }
 
     /// Adds the file or directory at `path` to the index.
-    fn add_path<P>(&mut self, repo: &Repository, path: P) -> Result<()>
+    fn add_path<P>(&mut self, wd: &WorkDir, path: P) -> Result<()>
     where
         P: AsRef<Path>
     {
@@ -319,11 +319,11 @@ impl Index {
             Ok(())
         }
         else if path.as_ref().is_file() {
-            self.add_file(repo, path)
+            self.add_file(wd, path)
         }
         else if path.as_ref().is_dir() {
             for entry in path.as_ref().read_dir()? {
-                self.add_path(repo, &entry?.path())?;
+                self.add_path(wd, &entry?.path())?;
             }
             Ok(())
         }
@@ -333,11 +333,11 @@ impl Index {
     }
 
     /// Adds the file at `path` to the index.
-    fn add_file<P>(&mut self, repo: &Repository, path: P) -> Result<()>
+    fn add_file<P>(&mut self, wd: &WorkDir, path: P) -> Result<()>
     where
         P: AsRef<Path>
     {
-        let name = repo.canonicalize_path(&path)?;
+        let name = wd.canonicalize_path(&path)?;
 
         // TODO observe .gitignore
         if name.starts_with("target/") {
@@ -374,7 +374,7 @@ impl Index {
 
         // File is new or modified
         // Store it in the repo and add it to the index
-        let hash = object.write(repo)?;
+        let hash = object.write(wd)?;
         let entry = IndexEntry {
             stats,
             hash,
@@ -387,12 +387,12 @@ impl Index {
     }
 
     /// Overwrites the index file of `repo` with this index.
-    pub fn write(&self, repo: &Repository) -> Result<()> {
+    pub fn write(&self, wd: &WorkDir) -> Result<()> {
         let mut options = OpenOptions::new();
         options.write(true)
             .create(true)
             .truncate(true);
-        let mut index_file = repo.open_git_file("index", Some(&options))?;
+        let mut index_file = wd.open_git_file("index", Some(&options))?;
     
         let data = self.serialize()?;
         index_file.write_all(&data)?;

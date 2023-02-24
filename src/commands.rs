@@ -15,11 +15,13 @@ use crate::{
         ObjectHash,
         ObjectFormat,
         Commit,
-        Tag, ObjectMetadata,
+        Tag,
+        ObjectMetadata,
     },
     refs,
     index::Index,
     branch,
+    workdir::WorkDir,
 };
 
 #[derive(Parser)]
@@ -79,14 +81,14 @@ pub struct AddArgs {
 
 pub fn cmd_add(args: AddArgs) -> Result<()> {
     let repo = Repository::find(".")?;
-    let mut index = Index::from_repo(&repo)?;
+    let mut index = Index::from_repo(repo.workdir())?;
 
     if !index.ext_data.is_empty() {
         eprintln!("Warning: index contains unsupported extensions.");
     }
 
-    index.add(&repo, &args.path)?;
-    index.write(&repo)?;
+    index.add(repo.workdir(), &args.path)?;
+    index.write(repo.workdir())?;
 
     Ok(())
 }
@@ -105,15 +107,15 @@ pub fn cmd_branch(args: BranchArgs) -> Result<()> {
     let repo = Repository::find(".")?;
     if let Some(branch_name) = args.branch_name {
         if args.delete {
-            branch::delete(&branch_name, &repo)?;
+            branch::delete(&branch_name, repo.workdir())?;
         }
         else {
-            let hash = GitObject::find(&repo, &args.start_point)?;
-            branch::create(&branch_name, &repo, &hash)?;
+            let hash = GitObject::find(repo.workdir(), &args.start_point)?;
+            branch::create(&branch_name, repo.workdir(), &hash)?;
         }
     }
     else {
-        refs::list(&repo)?.iter()
+        refs::list(repo.workdir())?.iter()
             .filter_map(|(name, _)| name.strip_prefix("refs/heads/"))
             .for_each(|name| println!("{name}"));
     }
@@ -134,8 +136,8 @@ pub struct CatFileArgs {
 
 pub fn cmd_cat_file(args: CatFileArgs) -> Result<()> {
     let repo = Repository::find(".")?;
-    let hash = GitObject::find(&repo, &args.object)?;
-    let object = GitObject::read(&repo, &hash)?;
+    let hash = GitObject::find(repo.workdir(), &args.object)?;
+    let object = GitObject::read(repo.workdir(), &hash)?;
 
     println!("{}", String::from_utf8_lossy(&object.serialize()));
 
@@ -153,15 +155,15 @@ pub struct CheckoutArgs {
 
 pub fn cmd_checkout(args: CheckoutArgs) -> Result<()> {
     let repo = Repository::find(".")?;
-    let hash = GitObject::find(&repo, &args.commit)?;
-    let mut object = GitObject::read(&repo, &hash)?;
+    let hash = GitObject::find(repo.workdir(), &args.commit)?;
+    let mut object = GitObject::read(repo.workdir(), &hash)?;
     
     if let GitObject::Commit(commit) = object {
         let tree_hash = match commit.map.get("tree") {
             Some(val) => ObjectHash::try_from(&val[..])?,
             None => return Err(Error::BadCommitFormat),
         };
-        object = GitObject::read(&repo, &tree_hash)?;
+        object = GitObject::read(repo.workdir(), &tree_hash)?;
     }
     
     if let GitObject::Tree(tree) = object {
@@ -177,7 +179,7 @@ pub fn cmd_checkout(args: CheckoutArgs) -> Result<()> {
             std::fs::create_dir(&args.path)?;
         }
 
-        tree.checkout(&repo, args.path)
+        tree.checkout(repo.workdir(), args.path)
     }
     else {
         Err(Error::ObjectNotTree)
@@ -194,10 +196,10 @@ pub struct CommitArgs {
 
 pub fn cmd_commit(args: CommitArgs) -> Result<()> {
     let repo = Repository::find(".")?;
-    let index = Index::from_repo(&repo)?;
+    let index = Index::from_repo(repo.workdir())?;
     let meta = ObjectMetadata::new(&repo, args.message)?;
 
-    let hash = Commit::create(&index, &repo, meta)?;
+    let hash = Commit::create(&index, repo.workdir(), meta)?;
     println!("{hash}");
 
     Ok(())
@@ -222,7 +224,7 @@ pub fn cmd_hash_object(args: HashObjectArgs) -> Result<()> {
     let object = GitObject::from_path(args.path, args.format.into())?;
     let hash = if args.write {
         let repo = Repository::find(".")?;
-        object.write(&repo)?
+        object.write(repo.workdir())?
     }
     else {
         object.hash()
@@ -261,26 +263,26 @@ pub fn cmd_log(args: LogArgs) -> Result<()> {
     let repo = Repository::find(".")?;
 
     println!("digraph wyaglog{{");
-    let hash = GitObject::find(&repo, &args.commit)?;
-    log_graphviz(&repo, &hash, &mut HashSet::new())?;
+    let hash = GitObject::find(repo.workdir(), &args.commit)?;
+    log_graphviz(repo.workdir(), &hash, &mut HashSet::new())?;
     println!("}}");
 
     Ok(())
 }
 
-fn log_graphviz(repo: &Repository, hash: &ObjectHash, seen: &mut HashSet<ObjectHash>) -> Result<()> {
+fn log_graphviz(wd: &WorkDir, hash: &ObjectHash, seen: &mut HashSet<ObjectHash>) -> Result<()> {
     if seen.contains(hash) {
         return Ok(());
     }
     seen.insert(*hash);
 
-    let commit = GitObject::read(repo, hash)?;
+    let commit = GitObject::read(wd, hash)?;
 
     if let GitObject::Commit(commit) = commit {
         for parent in commit.map.get_all("parent") {
             let parent_hash = ObjectHash::try_from(&parent[..])?;
             println!("c_{hash} -> c_{parent_hash}");
-            log_graphviz(repo, &parent_hash, seen)?;
+            log_graphviz(wd, &parent_hash, seen)?;
         }
 
         Ok(())
@@ -298,7 +300,7 @@ pub struct LsFilesArgs {
 
 pub fn cmd_ls_files(_args: LsFilesArgs) -> Result<()> {
     let repo = Repository::find(".")?;
-    let index = Index::from_repo(&repo)?;
+    let index = Index::from_repo(repo.workdir())?;
 
     if !index.ext_data.is_empty() {
         eprintln!("Warning: index contains unsupported extensions.");
@@ -320,14 +322,14 @@ pub struct LsTreeArgs {
 
 pub fn cmd_ls_tree(args: LsTreeArgs) -> Result<()> {
     let repo = Repository::find(".")?;
-    let hash = GitObject::find(&repo, &args.object)?;
-    let tree = match GitObject::read(&repo, &hash)? {
+    let hash = GitObject::find(repo.workdir(), &args.object)?;
+    let tree = match GitObject::read(repo.workdir(), &hash)? {
         GitObject::Tree(tree) => tree,
         _ => return Err(Error::ObjectNotTree),
     };
 
     for entry in &tree.entries {
-        let object = GitObject::read(&repo, &entry.hash)?;
+        let object = GitObject::read(repo.workdir(), &entry.hash)?;
         println!("{:0>6} {} {}\t{}", entry.mode, object.get_format(), entry.hash, entry.name);
     }
 
@@ -363,7 +365,7 @@ pub struct RevParseArgs {
 
 pub fn cmd_rev_parse(args: RevParseArgs) -> Result<()> {
     let repo = Repository::find(".")?;
-    let hashes = match GitObject::find(&repo, &args.name) {
+    let hashes = match GitObject::find(repo.workdir(), &args.name) {
         Ok(hash) => vec![hash],
         Err(err) => match err {
             Error::BadObjectId => vec![],
@@ -403,7 +405,7 @@ pub struct ShowRefArgs {
 
 pub fn cmd_show_ref(_args: ShowRefArgs) -> Result<()> {
     let repo = Repository::find(".")?;
-    let refs = refs::list(&repo)?;
+    let refs = refs::list(repo.workdir())?;
 
     for (name, hash) in refs {
         println!("{hash} {name}");
@@ -440,25 +442,25 @@ pub fn cmd_tag(args: TagArgs) -> Result<()> {
         let repo = Repository::find(".")?;
 
         if args.delete {
-            Tag::delete(&repo, &name)?;
+            Tag::delete(repo.workdir(), &name)?;
         }
         else{
             // Create a tag
-            let hash = GitObject::find(&repo, &args.object)?;
+            let hash = GitObject::find(repo.workdir(), &args.object)?;
             let meta = ObjectMetadata::new(&repo, args.message)?;
 
             if args.annotate {
-                Tag::create(&repo, &name, &hash, meta)?;
+                Tag::create(repo.workdir(), &name, &hash, meta)?;
             }
             else {
-                Tag::create_lightweight(&repo, &name, &hash)?;
+                Tag::create_lightweight(repo.workdir(), &name, &hash)?;
             }
         }
     }
     else {
         // List existing tags
         let repo = Repository::find(".")?;
-        let refs = refs::list(&repo)?;
+        let refs = refs::list(repo.workdir())?;
         let tag_names = refs.iter()
             .filter(|(name, _)| name.starts_with("refs/tags/"))
             .map(|(name, _)| &name["refs/tags/".len()..]);

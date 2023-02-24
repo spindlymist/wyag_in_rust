@@ -1,6 +1,6 @@
 use std::{path::Path, collections::HashSet};
 
-use crate::{Error, Result, repo::Repository, index::Index};
+use crate::{Error, Result, workdir::WorkDir, index::Index};
 use super::{ObjectHash, GitObject};
 
 pub struct Tree {
@@ -14,20 +14,20 @@ pub struct TreeEntry {
 }
 
 impl Tree {
-    pub fn checkout<P>(&self, repo: &Repository, path: P) -> Result<()>
+    pub fn checkout<P>(&self, wd: &WorkDir, path: P) -> Result<()>
     where
         P: AsRef<Path>
     {
         for entry in &self.entries {
             let object_path = path.as_ref().join(&entry.name);
 
-            match GitObject::read(repo, &entry.hash)? {
+            match GitObject::read(wd, &entry.hash)? {
                 GitObject::Blob(blob) => {
                     std::fs::write(object_path, blob.serialize_into())?;
                 },
                 GitObject::Tree(tree) => {
                     std::fs::create_dir(&object_path)?;
-                    tree.checkout(repo, object_path)?;
+                    tree.checkout(wd, object_path)?;
                 },
                 _ => return Err(Error::BadTreeFormat),
             };
@@ -36,11 +36,11 @@ impl Tree {
         Ok(())
     }
 
-    pub fn create_from_index(index: &Index, repo: &Repository) -> Result<(ObjectHash, GitObject)> {
-        Self::make_subtree(index, repo, "")
+    pub fn create_from_index(index: &Index, wd: &WorkDir) -> Result<(ObjectHash, GitObject)> {
+        Self::make_subtree(index, wd, "")
     }
 
-    fn make_subtree(index: &Index, repo: &Repository, prefix: &str) -> Result<(ObjectHash, GitObject)> {
+    fn make_subtree(index: &Index, wd: &WorkDir, prefix: &str) -> Result<(ObjectHash, GitObject)> {
         let mut entries = vec![];
         let mut prefixes_handled: HashSet<&str> = HashSet::new();
 
@@ -56,7 +56,7 @@ impl Tree {
                         prefixes_handled.insert(new_prefix);
                     }
 
-                    let (subtree_hash, _) = Self::make_subtree(index, repo, new_prefix)?;
+                    let (subtree_hash, _) = Self::make_subtree(index, wd, new_prefix)?;
                     let tree_entry = TreeEntry {
                         mode: "040000".to_owned(),
                         name: String::from(&suffix[..slash_idx]),
@@ -76,13 +76,13 @@ impl Tree {
         }
 
         let tree = GitObject::Tree(Tree { entries });
-        let hash = tree.write(repo)?;
+        let hash = tree.write(wd)?;
 
         Ok((hash, tree))
     }
 
-    pub fn read(repo: &Repository, hash: &ObjectHash) -> Result<Tree> {
-        match GitObject::read(repo, &hash)? {
+    pub fn read(wd: &WorkDir, hash: &ObjectHash) -> Result<Tree> {
+        match GitObject::read(wd, &hash)? {
             GitObject::Tree(tree) => Ok(tree),
             object => Err(Error::UnexpectedObjectFormat(object.get_format())),
         }
