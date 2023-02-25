@@ -37,7 +37,7 @@ impl Commit {
     }
 
     pub fn read(wd: &WorkDir, hash: &ObjectHash) -> Result<Commit> {
-        match GitObject::read(wd, &hash)? {
+        match GitObject::read(wd, hash)? {
             GitObject::Commit(commit) => Ok(commit),
             object => Err(Error::UnexpectedObjectFormat(object.get_format())),
         }

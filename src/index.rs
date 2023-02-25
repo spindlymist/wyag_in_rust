@@ -1,5 +1,5 @@
 use std::{
-    fs::{File, OpenOptions},
+    fs::OpenOptions,
     io::{BufRead, Seek, Write},
     path::{PathBuf, Path},
     collections::BTreeMap,
@@ -15,9 +15,13 @@ use crate::{
 };
 
 pub mod flags;
-pub mod stats;
 pub use flags::EntryFlags;
+
+pub mod stats;
 pub use stats::FileStats;
+
+pub mod diff;
+use diff::Mutation;
 
 /// Data on a single file stored in the index.
 pub struct IndexEntry {
@@ -284,107 +288,35 @@ impl Index {
     where
         P: AsRef<Path>
     {
-        self.prune_deleted_files(wd, &path)?;
-        self.add_path(wd, path)?;
+        let mutations = self.diff_with_dir(wd, &path)?;
+
+        for mutation in mutations.into_iter() {
+            match mutation {
+                Mutation::Created { path, stats } => {
+                    let object = GitObject::from_path(wd.working_path(&path), ObjectFormat::Blob)?;
+                    let flags = EntryFlags::new(&path);
+                    let path_buf = PathBuf::from(&path);
+                    self.entries.insert(path, IndexEntry {
+                        stats,
+                        hash: object.write(wd)?,
+                        flags,
+                        path: path_buf,
+                    });
+                },
+                Mutation::Deleted { path } => {
+                    self.entries.remove(&path);
+                },
+                Mutation::Modified { path, stats, object } => {
+                    let entry = self.entries.get_mut(&path).expect("Path should already exist in index");
+                    entry.stats = stats;
+                    entry.hash = object.write(wd)?;
+                },
+            };
+        }
 
         Ok(())
     }
 
-    /// Removes files from the index that no longer exist.
-    fn prune_deleted_files<P>(&mut self, wd: &WorkDir, path: P) -> Result<()>
-    where
-        P: AsRef<Path>
-    {
-        if !path.as_ref().is_dir() {
-            return Ok(());
-        }
-
-        let dir_name = wd.canonicalize_path(path)?;
-
-        self.entries.retain(|name, _| {
-            !name.starts_with(&dir_name)
-            || wd.working_path(name).is_file()
-        });
-
-        Ok(())
-    }
-
-    /// Adds the file or directory at `path` to the index.
-    fn add_path<P>(&mut self, wd: &WorkDir, path: P) -> Result<()>
-    where
-        P: AsRef<Path>
-    {
-        if path.as_ref().file_name().unwrap_or_default() == ".git" {
-            // Any directories named `.git` should be ignored
-            Ok(())
-        }
-        else if path.as_ref().is_file() {
-            self.add_file(wd, path)
-        }
-        else if path.as_ref().is_dir() {
-            for entry in path.as_ref().read_dir()? {
-                self.add_path(wd, &entry?.path())?;
-            }
-            Ok(())
-        }
-        else {
-            Err(Error::InvalidPath)
-        }
-    }
-
-    /// Adds the file at `path` to the index.
-    fn add_file<P>(&mut self, wd: &WorkDir, path: P) -> Result<()>
-    where
-        P: AsRef<Path>
-    {
-        let name = wd.canonicalize_path(&path)?;
-
-        // TODO observe .gitignore
-        if name.starts_with("target/") {
-            return Ok(());
-        }
-
-        let file = File::open(&path)?;
-        let stats = FileStats::from_file(&file)?;
-
-        let (object, flags) = if let Some(entry) = self.entries.get(&name) {
-            // If the file is already in the index, we can skip it if its stats
-            // haven't changed or if it's been explicitly marked valid by the user
-            if entry.flags.get_assume_valid() || stats == entry.stats {
-                return Ok(());
-            }
-
-            let object = GitObject::from_stream(file, ObjectFormat::Blob)?;
-
-            // We can also skip it if the contents haven't changed
-            let hash = object.hash();
-            if hash == entry.hash {
-                return Ok(());
-            }
-
-            (object, entry.flags)
-        }
-        else {
-            // New file
-            let object = GitObject::from_stream(file, ObjectFormat::Blob)?;
-            let flags = EntryFlags::new(&name);
-
-            (object, flags)
-        };
-
-        // File is new or modified
-        // Store it in the repo and add it to the index
-        let hash = object.write(wd)?;
-        let entry = IndexEntry {
-            stats,
-            hash,
-            flags,
-            path: PathBuf::from(&name),
-        };
-        self.entries.insert(name, entry);
-
-        Ok(())
-    }
 
     /// Overwrites the index file of `repo` with this index.
     pub fn write(&self, wd: &WorkDir) -> Result<()> {

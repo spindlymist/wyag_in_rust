@@ -82,7 +82,7 @@ impl Tree {
     }
 
     pub fn read(wd: &WorkDir, hash: &ObjectHash) -> Result<Tree> {
-        match GitObject::read(wd, &hash)? {
+        match GitObject::read(wd, hash)? {
             GitObject::Tree(tree) => Ok(tree),
             object => Err(Error::UnexpectedObjectFormat(object.get_format())),
         }
