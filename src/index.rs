@@ -1,7 +1,7 @@
 use std::{
     fs::OpenOptions,
     io::{BufRead, Seek, Write},
-    path::{PathBuf, Path},
+    path::Path,
     collections::BTreeMap,
 };
 
@@ -11,7 +11,7 @@ use crate::{
     Error,
     Result,
     object::{ObjectHash, GitObject, ObjectFormat},
-    workdir::{WorkDir, WorkPath},
+    workdir::{WorkDir, WorkPathBuf},
 };
 
 pub mod flags;
@@ -28,7 +28,6 @@ pub struct IndexEntry {
     pub stats: FileStats,
     pub hash: ObjectHash,
     pub flags: EntryFlags,
-    pub path: PathBuf,
 }
 
 /// The index file (or staging area) that git uses to prepare the next commit.
@@ -40,7 +39,7 @@ pub struct IndexEntry {
 /// Extensions are not supported.
 pub struct Index {
     pub version: u32,
-    pub entries: BTreeMap<WorkPath, IndexEntry>,
+    pub entries: BTreeMap<WorkPathBuf, IndexEntry>,
     pub ext_data: Vec<u8>,
 }
 
@@ -83,8 +82,8 @@ impl Index {
         // Parse entries
         let mut entries = BTreeMap::new();
         for _ in 0..entry_count {
-            let entry = Self::parse_next_entry(reader)?;
-            entries.insert(entry.path.to_string_lossy().to_string(), entry);
+            let (path, entry) = Self::parse_next_entry(reader)?;
+            entries.insert(path, entry);
         }
 
         // Any remaining data is for extensions
@@ -99,7 +98,7 @@ impl Index {
     }
 
     /// Parses one index entry from `reader`.
-    fn parse_next_entry<R>(reader: &mut R) -> Result<IndexEntry>
+    fn parse_next_entry<R>(reader: &mut R) -> Result<(WorkPathBuf, IndexEntry)>
     where
         R: BufRead + Seek
     {
@@ -152,24 +151,8 @@ impl Index {
             }
 
             let bytes = &bytes[..bytes.len() - 1]; // drop the null terminator
-
-            let path = match std::str::from_utf8(bytes) {
-                Ok(value) => value,
-                Err(_) => return Err(Error::BadIndexFormat("Path is not valid utf8".to_owned())),
-            };
-
-            match path {
-                ".git" => return Err(Error::BadIndexFormat("Forbidden path .git".to_owned())),
-                ".." => return Err(Error::BadIndexFormat("Forbidden path ..".to_owned())),
-                "." => return Err(Error::BadIndexFormat("Forbidden path .".to_owned())),
-                _ => (),
-            };
-
-            if path.ends_with('/') {
-                return Err(Error::BadIndexFormat("Trailing slash is forbidden".to_owned()));
-            }
-
-            PathBuf::from(path)
+            
+            WorkPathBuf::try_from(bytes)?
         };
 
         // Each entry ends with 0-7 additional NULL bytes to maintain 8-byte alignment
@@ -181,12 +164,11 @@ impl Index {
             reader.seek(std::io::SeekFrom::Current(padding as i64))?;
         }
 
-        Ok(IndexEntry {
+        Ok((path, IndexEntry {
             stats,
             hash,
             flags,
-            path,
-        })
+        }))
     }
 
     /// Calculates the number of null bytes that should follow an index entry of
@@ -214,7 +196,7 @@ impl Index {
         data.write_u32::<BigEndian>(self.entries.len() as u32)?;
 
         // Serialize entries
-        for entry in self.entries.values() {
+        for (path, entry) in &self.entries {
             let start_len = data.len();
 
             // File stats
@@ -239,7 +221,7 @@ impl Index {
             }
 
             // Path
-            data.write_all(entry.path.to_string_lossy().as_bytes())?;
+            data.write_all(path.as_bytes())?;
 
             // Padding
             let len = data.len() - start_len;
@@ -294,13 +276,11 @@ impl Index {
             match mutation {
                 Mutation::Created { path, stats } => {
                     let object = GitObject::from_path(wd.working_path(&path), ObjectFormat::Blob)?;
-                    let flags = EntryFlags::new(&path);
-                    let path_buf = PathBuf::from(&path);
+                    let flags = EntryFlags::new(path.as_str());
                     self.entries.insert(path, IndexEntry {
                         stats,
                         hash: object.write(wd)?,
                         flags,
-                        path: path_buf,
                     });
                 },
                 Mutation::Deleted { path } => {

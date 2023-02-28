@@ -2,6 +2,8 @@ use std::{
     error,
     io,
     fmt,
+    str,
+    string,
 };
 
 use crate::object::{ObjectHash, ObjectFormat};
@@ -36,8 +38,11 @@ pub enum Error {
     BranchIsCheckedOut,
     BranchPossiblyUnmerged,
     UnexpectedObjectFormat(ObjectFormat),
+    ForbiddenPathComponent(String),
+    PathIsAbsolute,
     Io(io::Error),
     Ini(ini::Error),
+    Utf8(str::Utf8Error),
 }
 
 impl fmt::Display for Error {
@@ -57,5 +62,17 @@ impl From<io::Error> for Error {
 impl From<ini::Error> for Error {
     fn from(value: ini::Error) -> Self {
         Error::Ini(value)
+    }
+}
+
+impl From<str::Utf8Error> for Error {
+    fn from(value: str::Utf8Error) -> Self {
+        Error::Utf8(value)
+    }
+}
+
+impl From<string::FromUtf8Error> for Error {
+    fn from(value: string::FromUtf8Error) -> Self {
+        Error::Utf8(value.utf8_error())
     }
 }

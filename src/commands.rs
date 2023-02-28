@@ -306,8 +306,8 @@ pub fn cmd_ls_files(_args: LsFilesArgs) -> Result<()> {
         eprintln!("Warning: index contains unsupported extensions.");
     }
 
-    for entry in index.entries.values() {
-        println!("{} {}", entry.hash, entry.path.to_string_lossy());
+    for (path, entry) in index.entries {
+        println!("{} {}", entry.hash, path);
     }
 
     Ok(())

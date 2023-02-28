@@ -4,23 +4,22 @@ use std::{
 };
 
 use crate::{
-    Error,
     Result,
     index::{Index, FileStats},
-    workdir::{WorkDir, WorkPath},
-    object::{GitObject, ObjectFormat, ObjectHash, Tree},
+    workdir::{WorkDir, WorkPathBuf},
+    object::{GitObject, ObjectFormat},
 };
 
 pub enum Mutation {
     Created {
-        path: WorkPath,
+        path: WorkPathBuf,
         stats: FileStats,
     },
     Deleted {
-        path: WorkPath,
+        path: WorkPathBuf,
     },
     Modified {
-        path: WorkPath,
+        path: WorkPathBuf,
         stats: FileStats,
         object: GitObject,
     },
@@ -48,50 +47,18 @@ impl Index {
     }
 
     /// Enumerates the files deleted from the directory at `path`.
-    fn find_deletions(&self, path: WorkPath, changes: &mut Vec<Mutation>) -> Result<()> {
-        let mutations =
-            self.entries
-            .iter()
-            .filter(|(name, _)| { // In theory, this can be done more efficiently with BTreeMap::range
-                name.starts_with(&path)
-                && !AsRef::<Path>::as_ref(&path).is_file()
-            })
-            .map(|(name, _)| Mutation::Deleted {
-                path: name.into(),
-            });
-        changes.extend(mutations);
-
-        Ok(())
+    fn find_deletions(&self, _path: WorkPathBuf, _changes: &mut Vec<Mutation>) -> Result<()> {
+        todo!()
     }
 
     /// Enumerates the files created or modified in the directory at `path`.
-    fn find_mutations(&self, path: WorkPath, changes: &mut Vec<Mutation>) -> Result<()>
+    fn find_mutations(&self, _path: WorkPathBuf, _changes: &mut Vec<Mutation>) -> Result<()>
     {
-        let path_ref: &Path = path.as_ref();
-
-        // TODO observe .gitignore
-        if path_ref.file_name().unwrap_or_default() == ".git" {
-            Ok(())
-        }
-        else if path_ref.is_file() {
-            if let Some(mutation) = self.compare_file(path)? {
-                changes.push(mutation);
-            }
-            Ok(())
-        }
-        else if path_ref.is_dir() {
-            for entry in path_ref.read_dir()? {
-                self.find_mutations(format!("{path}/{:?}", entry?.file_name()), changes)?;
-            }
-            Ok(())
-        }
-        else {
-            Err(Error::InvalidPath)
-        }
+        todo!()
     }
 
     /// Determines if the file at `path` is new or has been modified.
-    fn compare_file(&self, path: WorkPath) -> Result<Option<Mutation>> {
+    fn _compare_file(&self, path: WorkPathBuf) -> Result<Option<Mutation>> {
         let file = File::open(&path)?;
         let stats = FileStats::from_file(&file)?;
 

@@ -6,7 +6,9 @@ use path_absolutize::Absolutize;
 
 use crate::{Result, Error};
 
-pub type WorkPath = String;
+mod workpath;
+pub use workpath::WorkPath;
+pub use workpath::WorkPathBuf;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WorkDir(PathBuf);
@@ -33,22 +35,17 @@ impl WorkDir {
     /// 
     /// The canonical name is relative to the working directory, uses `/` for the path separator,
     /// and does not begin or end with a slash.
-    pub fn canonicalize_path<P>(&self, path: P) -> Result<WorkPath>
+    pub fn canonicalize_path<P>(&self, path: P) -> Result<WorkPathBuf>
     where
         P: AsRef<Path>
     {
         let abs_path = path.as_ref().absolutize()?;
-
-        let mut name = match abs_path.strip_prefix(&self.0) {
-            Ok(path) => path.to_string_lossy().replace('\\', "/"),
+        let rel_path = match abs_path.strip_prefix(&self.0) {
+            Ok(val) => val,
             Err(_) => return Err(Error::InvalidPath),
         };
 
-        if name.ends_with('/') {
-            name.truncate(name.len() - 1);
-        }
-
-        Ok(name)
+        WorkPathBuf::try_from(rel_path)
     }
 
     /// Appends a relative path to the repo's .git directory.
