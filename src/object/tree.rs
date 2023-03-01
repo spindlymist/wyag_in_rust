@@ -1,8 +1,8 @@
 use std::{
-    path::Path
+    path::Path, collections::HashSet
 };
 
-use crate::{Error, Result, workdir::{WorkDir, WorkPathBuf}, index::Index};
+use crate::{Error, Result, workdir::{WorkDir, WorkPathBuf, WorkPath}, index::Index};
 use super::{ObjectHash, GitObject};
 
 pub struct Tree {
@@ -39,11 +39,49 @@ impl Tree {
     }
 
     pub fn create_from_index(index: &Index, wd: &WorkDir) -> Result<(ObjectHash, GitObject)> {
-        Self::make_subtree(index, wd, &WorkPathBuf::try_from("")?)
+        let prefix = WorkPathBuf::try_from("")?;
+        Self::make_subtree(index, wd, &prefix)
     }
 
-    fn make_subtree(_index: &Index, _wd: &WorkDir, _prefix: &WorkPathBuf) -> Result<(ObjectHash, GitObject)> {
-        todo!()
+    fn make_subtree(index: &Index, wd: &WorkDir, prefix: &WorkPath) -> Result<(ObjectHash, GitObject)> {
+        let mut entries = vec![];
+        let mut subtrees_handled: HashSet<&WorkPath> = HashSet::new();
+        
+        let index_entries = index.range_from_prefix(prefix);
+        for (path, index_entry) in index_entries {
+            let (name, subpath) =
+                path.strip_prefix(prefix)
+                .expect("Prefix should be present because it's used to construct range")
+                .partition();
+
+            if let Some(subpath) = subpath {
+                let subtree_prefix = path.strip_suffix(subpath).expect("rest should be a suffix of path");
+                if !subtrees_handled.insert(subtree_prefix) {
+                    continue;
+                }
+
+                let (subtree_hash, _) = Self::make_subtree(index, wd, subtree_prefix)?;
+                let tree_entry = TreeEntry {
+                    mode: "040000".to_owned(),
+                    name: name.to_string(),
+                    hash: subtree_hash,
+                };
+                entries.push(tree_entry);
+            }
+            else {
+                let tree_entry = TreeEntry {
+                    mode: index_entry.stats.get_mode_string(),
+                    name: name.to_string(),
+                    hash: index_entry.hash,
+                };
+                entries.push(tree_entry);
+            }
+        }
+
+        let tree = GitObject::Tree(Tree { entries });
+        let hash = tree.write(wd)?;
+
+        Ok((hash, tree))
     }
 
     pub fn read(wd: &WorkDir, hash: &ObjectHash) -> Result<Tree> {

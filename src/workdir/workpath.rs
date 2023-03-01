@@ -3,24 +3,102 @@ use std::{ops::Deref, borrow::Borrow, path::{Path, PathBuf}, fmt};
 use crate::Error;
 
 #[repr(transparent)]
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WorkPath(str);
 
 #[repr(transparent)]
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub struct WorkPathBuf(String);
 
 impl WorkPath {
     unsafe fn from_str(slice: &str) -> &Self {
         std::mem::transmute(slice)
     }
+
+    pub fn strip_prefix(&self, prefix: &WorkPath) -> Option<&Self> {
+        if let Some(suffix) = self.0.strip_prefix(&prefix.0) {
+            if suffix.is_empty() {
+                unsafe { Some(Self::from_str(suffix)) }
+            }
+            else {
+                unsafe { Some(Self::from_str(&suffix[1..])) }
+            }
+        }
+        else {
+            None
+        }
+    }
+
+    pub fn strip_suffix(&self, suffix: &WorkPath) -> Option<&Self> {
+        if let Some(suffix) = self.0.strip_suffix(&suffix.0) {
+            if suffix.is_empty() {
+                unsafe { Some(Self::from_str(suffix)) }
+            }
+            else {
+                unsafe { Some(Self::from_str(&suffix[..suffix.len() - 1])) }
+            }
+        }
+        else {
+            None
+        }
+    }
+
+    pub fn parent(&self) -> Option<&Self> {
+        if self.0.is_empty() {
+            None
+        }
+        else if let Some(last_sep_idx) = self.0.rfind('/') {
+            let slice = &self.0[..last_sep_idx];
+            unsafe { Some(Self::from_str(slice)) }
+        }
+        else {
+            unsafe {
+                Some(Self::from_str(""))
+            }
+        }
+    }
+
+    pub fn file_name(&self) -> &Self {
+        if let Some(last_sep_idx) = self.0.rfind('/') {
+            let slice = &self.0[last_sep_idx + 1..];
+            unsafe { Self::from_str(slice) }
+        }
+        else {
+            self
+        }
+    }
+
+    pub fn partition(&self) -> (&Self, Option<&Self>) {
+        if let Some((first, rest)) = self.0.split_once('/') {
+            unsafe {
+                (Self::from_str(first),
+                    Some(Self::from_str(rest))
+                )
+            }
+        }
+        else {
+            (self, None)
+        }
+    }
+}
+
+impl Borrow<str> for WorkPath {
+    fn borrow(&self) -> &str {
+        &self.0
+    }
 }
 
 impl ToOwned for WorkPath {
     type Owned = WorkPathBuf;
-
+    
     fn to_owned(&self) -> Self::Owned {
         Self::Owned::from(self)
+    }
+}
+
+impl fmt::Display for WorkPath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", &self.0)
     }
 }
 
@@ -51,6 +129,12 @@ impl Deref for WorkPathBuf {
 impl Borrow<WorkPath> for WorkPathBuf {
     fn borrow(&self) -> &WorkPath {
         self
+    }
+}
+
+impl Borrow<String> for WorkPathBuf {
+    fn borrow(&self) -> &String {
+        &self.0
     }
 }
 

@@ -11,7 +11,7 @@ use crate::{
     Error,
     Result,
     object::{ObjectHash, GitObject, ObjectFormat},
-    workdir::{WorkDir, WorkPathBuf},
+    workdir::{WorkDir, WorkPathBuf, WorkPath},
 };
 
 pub mod flags;
@@ -43,7 +43,10 @@ pub struct Index {
     pub ext_data: Vec<u8>,
 }
 
+pub type IndexRange<'a> = std::collections::btree_map::Range<'a, WorkPathBuf, IndexEntry>;
+
 impl Index {
+
     /// 4-byte signature that begins a valid index file.
     const INDEX_SIGNATURE: [u8; 4] = [b'D', b'I', b'R', b'C'];
 
@@ -183,6 +186,13 @@ impl Index {
         else {
             8 - (len % 8)
         }
+    }
+
+    pub fn range_from_prefix(&self, prefix: &WorkPath) -> IndexRange {
+        let range_start = std::ops::Bound::Excluded(format!("{prefix}/"));
+        let range_end = std::ops::Bound::Excluded(format!("{prefix}0"));
+
+        self.entries.range((range_start, range_end))
     }
 
     /// Converts the index into a sequence of bytes.
