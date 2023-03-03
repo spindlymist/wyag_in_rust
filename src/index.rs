@@ -6,12 +6,13 @@ use std::{
 };
 
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use path_absolutize::Absolutize;
 
 use crate::{
     Error,
     Result,
-    object::{ObjectHash, GitObject, ObjectFormat},
-    workdir::{WorkDir, WorkPathBuf, WorkPath},
+    object::ObjectHash,
+    workdir::{WorkDir, WorkPathBuf, WorkPath}, branch,
 };
 
 pub mod flags;
@@ -21,7 +22,8 @@ pub mod stats;
 pub use stats::FileStats;
 
 pub mod diff;
-use diff::Mutation;
+pub use diff::UnstagedChange;
+pub use diff::StagedChange;
 
 /// Data on a single file stored in the index.
 pub struct IndexEntry {
@@ -189,6 +191,10 @@ impl Index {
     }
 
     pub fn range_from_prefix(&self, prefix: &WorkPath) -> IndexRange {
+        if prefix.is_empty() {
+            return self.entries.range::<WorkPathBuf, std::ops::RangeFull>(..);
+        }
+
         let range_start = std::ops::Bound::Excluded(format!("{prefix}/"));
         let range_end = std::ops::Bound::Excluded(format!("{prefix}0"));
 
@@ -280,26 +286,29 @@ impl Index {
     where
         P: AsRef<Path>
     {
-        let mutations = self.diff_with_dir(wd, &path)?;
+        let path = wd.canonicalize_path(path)?;
+        let changes = self.list_unstaged_changes(wd, &path, true)?;
 
-        for mutation in mutations.into_iter() {
-            match mutation {
-                Mutation::Created { path, stats } => {
-                    let object = GitObject::from_path(wd.working_path(&path), ObjectFormat::Blob)?;
+        for change in changes.into_iter() {
+            match change {
+                UnstagedChange::Created { path, stats, hash } => {
+                    println!("created:   {path}");
                     let flags = EntryFlags::new(path.as_str());
                     self.entries.insert(path, IndexEntry {
                         stats,
-                        hash: object.write(wd)?,
+                        hash,
                         flags,
                     });
                 },
-                Mutation::Deleted { path } => {
+                UnstagedChange::Deleted { path } => {
+                    println!("deleted:   {path}");
                     self.entries.remove(&path);
                 },
-                Mutation::Modified { path, stats, object } => {
+                UnstagedChange::Modified { path, stats, hash } => {
+                    println!("modified:  {path}");
                     let entry = self.entries.get_mut(&path).expect("Path should already exist in index");
                     entry.stats = stats;
-                    entry.hash = object.write(wd)?;
+                    entry.hash = hash;
                 },
             };
         }
@@ -307,6 +316,73 @@ impl Index {
         Ok(())
     }
 
+    pub fn remove<P>(&mut self, wd: &WorkDir, path: P) -> Result<()>
+    where
+        P: AsRef<Path>
+    {
+        let path = wd.canonicalize_path(path)?;
+
+        {
+            let unstaged_changes = self.list_unstaged_changes(wd, &path, false)?;
+            if !unstaged_changes.is_empty() {
+                return Err(Error::UncommittedChanges);
+            }
+        }
+
+        {
+            let commit_hash = branch::get_current(wd)?.tip(wd)?;
+            let staged_changes = self.list_staged_changes(wd, &commit_hash, &path)?;
+            if !staged_changes.is_empty() {
+                return Err(Error::UncommittedChanges);
+            }
+        }
+
+        if let Some(abs_path) = path.as_ref().absolutize()?.to_str() {
+            if path.as_ref().is_dir() {
+                println!("Type the full path of the directory to delete it *and all of its children*:");
+            }
+            else if path.as_ref().is_file() {
+                println!("Type the full path of the file to delete it:");
+            }
+            else {
+                println!("The path does not exist");
+                return Ok(());
+            }
+
+            println!("{abs_path}");
+
+            let mut confirm = String::new();
+            std::io::stdin().read_line(&mut confirm)?;
+
+            if confirm.trim_end() == abs_path {
+                if path.as_ref().is_dir() {
+                    std::fs::remove_dir_all(&path)?;
+                }
+                else {
+                    std::fs::remove_file(&path)?;
+                }
+
+                if self.entries.contains_key(&path) {
+                    self.entries.remove(&path);
+                }
+                else {
+                    let keys_to_remove: Vec<_> =
+                        self.range_from_prefix(&path)
+                        .map(|(key, _)| key)
+                        .cloned()
+                        .collect();
+
+                    for key in keys_to_remove {
+                        self.entries.remove(&key);
+                    }
+                }
+
+
+            }
+        }
+
+        Ok(())
+    }
 
     /// Overwrites the index file of `repo` with this index.
     pub fn write(&self, wd: &WorkDir) -> Result<()> {

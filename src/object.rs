@@ -28,7 +28,7 @@ pub use commit::Commit;
 pub use hash::ObjectHash;
 pub use meta::ObjectMetadata;
 pub use tag::Tag;
-pub use tree::Tree;
+pub use tree::{Tree, TreeEntry};
 
 pub enum GitObject {
     Blob(Blob),

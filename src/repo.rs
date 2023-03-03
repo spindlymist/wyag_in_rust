@@ -48,7 +48,6 @@ impl Repository {
         
         // Create directories
         fs::create_dir_all(repo.workdir.git_path("."))?;
-        repo.workdir.make_git_dir("branches")?;
         repo.workdir.make_git_dir("objects")?;
         repo.workdir.make_git_dir("refs/tags")?;
         repo.workdir.make_git_dir("refs/heads")?;

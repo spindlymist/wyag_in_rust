@@ -1,17 +1,17 @@
 use std::{
-    path::Path, collections::HashSet
+    path::Path, collections::{HashSet, BTreeMap}
 };
 
 use crate::{Error, Result, workdir::{WorkDir, WorkPathBuf, WorkPath}, index::Index};
 use super::{ObjectHash, GitObject};
 
 pub struct Tree {
-    pub entries: Vec<TreeEntry>,
+    pub entries: BTreeMap<WorkPathBuf, TreeEntry>,
 }
 
+#[derive(Clone)]
 pub struct TreeEntry {
     pub mode: String,
-    pub name: String,
     pub hash: ObjectHash,
 }
 
@@ -20,8 +20,8 @@ impl Tree {
     where
         P: AsRef<Path>
     {
-        for entry in &self.entries {
-            let object_path = path.as_ref().join(&entry.name);
+        for (name, entry) in &self.entries {
+            let object_path = path.as_ref().join(name);
 
             match GitObject::read(wd, &entry.hash)? {
                 GitObject::Blob(blob) => {
@@ -44,7 +44,7 @@ impl Tree {
     }
 
     fn make_subtree(index: &Index, wd: &WorkDir, prefix: &WorkPath) -> Result<(ObjectHash, GitObject)> {
-        let mut entries = vec![];
+        let mut entries = BTreeMap::new();
         let mut subtrees_handled: HashSet<&WorkPath> = HashSet::new();
         
         let index_entries = index.range_from_prefix(prefix);
@@ -63,18 +63,16 @@ impl Tree {
                 let (subtree_hash, _) = Self::make_subtree(index, wd, subtree_prefix)?;
                 let tree_entry = TreeEntry {
                     mode: "040000".to_owned(),
-                    name: name.to_string(),
                     hash: subtree_hash,
                 };
-                entries.push(tree_entry);
+                entries.insert(name.to_owned(), tree_entry);
             }
             else {
                 let tree_entry = TreeEntry {
                     mode: index_entry.stats.get_mode_string(),
-                    name: name.to_string(),
                     hash: index_entry.hash,
                 };
-                entries.push(tree_entry);
+                entries.insert(name.to_owned(), tree_entry);
             }
         }
 
@@ -84,6 +82,24 @@ impl Tree {
         Ok((hash, tree))
     }
 
+    pub fn find_entry(&self, wd: &WorkDir, path: &WorkPath) -> Result<Option<TreeEntry>> {
+        if let Some(entry) = self.entries.get(path) {
+            Ok(Some(entry.clone()))
+        }
+        else {
+            let (first, rest) = path.partition();
+
+            if let Some(rest) = rest {
+                if let Some(entry) = self.entries.get(first) {
+                    let subtree = Tree::read(wd, &entry.hash)?;
+                    return subtree.find_entry(wd, rest);
+                }
+            }
+
+            Ok(None)
+        }
+    }
+
     pub fn read(wd: &WorkDir, hash: &ObjectHash) -> Result<Tree> {
         match GitObject::read(wd, hash)? {
             GitObject::Tree(tree) => Ok(tree),
@@ -91,38 +107,53 @@ impl Tree {
         }
     }
 
+    pub fn read_from_commit(wd: &WorkDir, commit_hash: &ObjectHash) -> Result<Tree> {
+        let commit = super::Commit::read(wd, commit_hash)?;
+
+        let tree_hash = match commit.map.get("tree") {
+            Some(val) => ObjectHash::try_from(&val[..])?,
+            None => return Err(Error::BadCommitFormat),
+        };
+
+        Self::read(wd, &tree_hash)
+    }
+
     pub fn deserialize(data: Vec<u8>) -> Result<Tree> {
-        let mut entries = vec![];
+        let mut entries = BTreeMap::new();
         let mut iter = data.into_iter();
 
         loop {
-            let mode: Vec<u8> = iter.by_ref()
-                .take_while(|ch| *ch != b' ')
-                .collect();
-            if mode.is_empty() { break; }
-            let mode = match String::from_utf8(mode) {
-                Ok(val) => val,
-                Err(_) => return Err(Error::BadTreeFormat),
+            let mode = {
+                let mode_bytes: Vec<u8> = iter.by_ref()
+                    .take_while(|ch| *ch != b' ')
+                    .collect();
+                String::from_utf8(mode_bytes)?
             };
 
-            let name: Vec<u8> = iter.by_ref()
-                .take_while(|ch| *ch != 0)
-                .collect();
-            let name = match String::from_utf8(name) {
-                Ok(val) => val,
-                Err(_) => return Err(Error::BadTreeFormat),
+            if mode.is_empty() {
+                break;
+            }
+
+            let path = {
+                let path: Vec<u8> = iter.by_ref()
+                    .take_while(|ch| *ch != 0)
+                    .collect();
+
+                WorkPathBuf::try_from(&path[..])?
             };
 
-            let hash: Vec<u8> = iter.by_ref().take(20).collect();
-            let hash: [u8; 20] = match hash.try_into() {
-                Ok(val) => val,
-                Err(_) => return Err(Error::BadTreeFormat),
-            };
-            let hash = ObjectHash { raw: hash };
+            let hash = {
+                let hash_bytes: Vec<u8> = iter.by_ref().take(20).collect();
+                let hash: [u8; 20] = match hash_bytes.try_into() {
+                    Ok(val) => val,
+                    Err(_) => return Err(Error::BadTreeFormat),
+                };
 
-            entries.push(TreeEntry {
+                ObjectHash { raw: hash }
+            };
+
+            entries.insert(path, TreeEntry {
                 mode,
-                name,
                 hash
             });
         }
@@ -133,8 +164,8 @@ impl Tree {
     pub fn serialize(&self) -> Vec<u8> {
         let mut data = vec![];
 
-        for entry in &self.entries {
-            data.extend(format!("{} {}\0", entry.mode, entry.name).into_bytes());
+        for (path, entry) in &self.entries {
+            data.extend(format!("{} {}\0", entry.mode, path).into_bytes());
             data.extend(entry.hash.raw);
         }
 
@@ -143,5 +174,11 @@ impl Tree {
 
     pub fn serialize_into(self) -> Vec<u8> {
         self.serialize()
+    }
+}
+
+impl TreeEntry {
+    pub fn is_dir(&self) -> bool {
+        self.mode == "040000"
     }
 }

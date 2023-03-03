@@ -1,4 +1,4 @@
-use std::{ops::Deref, borrow::Borrow, path::{Path, PathBuf}, fmt};
+use std::{ops::Deref, borrow::Borrow, path::{Path, PathBuf}, fmt, ffi::OsString};
 
 use crate::Error;
 
@@ -15,8 +15,15 @@ impl WorkPath {
         std::mem::transmute(slice)
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub fn strip_prefix(&self, prefix: &WorkPath) -> Option<&Self> {
-        if let Some(suffix) = self.0.strip_prefix(&prefix.0) {
+        if prefix.is_empty() {
+            Some(self)
+        }
+        else if let Some(suffix) = self.0.strip_prefix(&prefix.0) {
             if suffix.is_empty() {
                 unsafe { Some(Self::from_str(suffix)) }
             }
@@ -88,11 +95,23 @@ impl Borrow<str> for WorkPath {
     }
 }
 
+impl AsRef<Path> for WorkPath {
+    fn as_ref(&self) -> &Path {
+        self.0.as_ref()
+    }
+}
+
 impl ToOwned for WorkPath {
     type Owned = WorkPathBuf;
     
     fn to_owned(&self) -> Self::Owned {
         Self::Owned::from(self)
+    }
+}
+
+impl PartialEq<str> for WorkPath {
+    fn eq(&self, other: &str) -> bool {
+        &self.0 == other
     }
 }
 
@@ -103,6 +122,28 @@ impl fmt::Display for WorkPath {
 }
 
 impl WorkPathBuf {
+    pub fn push(&mut self, path: &WorkPath) {
+        self.0.push('/');
+        self.0.push_str(&path.0);
+    }
+
+    pub fn pop(&mut self) -> bool {
+        if self.0.is_empty() {
+            return false;
+        }
+        
+        let last_sep_index = self.0.rfind('/').unwrap_or(0);
+        self.0.truncate(last_sep_index);
+
+        true
+    }
+
+    pub fn join(&self, path: &WorkPath) -> WorkPathBuf {
+        let mut new_path = self.clone();
+        new_path.push(path);
+        new_path
+    }
+
     pub fn as_bytes(&self) -> &[u8] {
         self.0.as_ref()
     }
@@ -185,6 +226,19 @@ impl TryFrom<String> for WorkPathBuf {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::try_from(value.as_str())
+    }
+}
+
+impl TryFrom<OsString> for WorkPathBuf {
+    type Error = Error;
+
+    fn try_from(value: OsString) -> Result<Self, Self::Error> {
+        if let Some(value) = value.to_str() {
+            Self::try_from(value)
+        }
+        else {
+            Err(Error::InvalidUnicodePath(value))
+        }
     }
 }
 

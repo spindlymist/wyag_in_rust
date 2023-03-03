@@ -3,7 +3,7 @@ use std::{
     io,
     fmt,
     str,
-    string,
+    string, ffi::OsString,
 };
 
 use crate::object::{ObjectHash, ObjectFormat};
@@ -40,6 +40,8 @@ pub enum Error {
     UnexpectedObjectFormat(ObjectFormat),
     ForbiddenPathComponent(String),
     PathIsAbsolute,
+    UncommittedChanges,
+    InvalidUnicodePath(OsString),
     Io(io::Error),
     Ini(ini::Error),
     Utf8(str::Utf8Error),

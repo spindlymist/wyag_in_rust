@@ -328,9 +328,9 @@ pub fn cmd_ls_tree(args: LsTreeArgs) -> Result<()> {
         _ => return Err(Error::ObjectNotTree),
     };
 
-    for entry in &tree.entries {
+    for (path, entry) in &tree.entries {
         let object = GitObject::read(repo.workdir(), &entry.hash)?;
-        println!("{:0>6} {} {}\t{}", entry.mode, object.get_format(), entry.hash, entry.name);
+        println!("{:0>6} {} {}\t{}", entry.mode, object.get_format(), entry.hash, path);
     }
 
     Ok(())
@@ -388,12 +388,24 @@ pub fn cmd_rev_parse(args: RevParseArgs) -> Result<()> {
     Ok(())
 }
 
+/// Removes files from the staging index and file system
 #[derive(Args)]
 pub struct RmArgs {
-    
+    /// The file or directory to remove. Must match index and branch tip.
+    path: PathBuf,
 }
 
-pub fn cmd_rm(_args: RmArgs) -> Result<()> {
+pub fn cmd_rm(args: RmArgs) -> Result<()> {
+    let repo = Repository::find(".")?;
+    let mut index = Index::from_repo(repo.workdir())?;
+
+    if !index.ext_data.is_empty() {
+        eprintln!("Warning: index contains unsupported extensions.");
+    }
+
+    index.remove(repo.workdir(), &args.path)?;
+    index.write(repo.workdir())?;
+
     Ok(())
 }
 
