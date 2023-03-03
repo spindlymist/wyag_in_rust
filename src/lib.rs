@@ -30,6 +30,7 @@ pub fn run(cli: Cli) {
         Commands::Rebase(args) => cmd_rebase(args),
         Commands::RevParse(args) => cmd_rev_parse(args),
         Commands::Rm(args) => cmd_rm(args),
+        Commands::Status(args) => cmd_status(args),
         Commands::ShowRef(args) => cmd_show_ref(args),
         Commands::Tag(args) => cmd_tag(args),
     };

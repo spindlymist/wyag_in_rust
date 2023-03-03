@@ -19,7 +19,7 @@ use crate::{
         ObjectMetadata,
     },
     refs,
-    index::Index,
+    index::{Index, UnstagedChange, StagedChange},
     branch,
     workdir::WorkDir,
 };
@@ -48,6 +48,7 @@ pub enum Commands {
    RevParse(RevParseArgs),
    Rm(RmArgs),
    ShowRef(ShowRefArgs),
+   Status(StatusArgs),
    Tag(TagArgs),
 }
 
@@ -405,6 +406,59 @@ pub fn cmd_rm(args: RmArgs) -> Result<()> {
 
     index.remove(repo.workdir(), &args.path)?;
     index.write(repo.workdir())?;
+
+    Ok(())
+}
+
+/// List staged and unstaged changes 
+#[derive(Args)]
+pub struct StatusArgs {
+    /// The file or directory to compare
+    #[arg(default_value = ".")]
+    path: PathBuf,
+}
+
+pub fn cmd_status(args: StatusArgs) -> Result<()> {
+    let (staged_changes, unstaged_changes) = {
+        let repo = Repository::find(".")?;
+        let wd = repo.workdir();
+        let path = wd.canonicalize_path(args.path)?;
+        let index = Index::from_repo(wd)?;
+        let commit_hash = branch::get_current(wd)?.tip(wd)?;
+        
+        (
+            index.list_staged_changes(wd, &commit_hash, &path)?,
+            index.list_unstaged_changes(wd, &path, false)?
+        )
+    };
+
+    if !staged_changes.is_empty() {
+        println!("Changes staged for commit:");
+        for change in staged_changes {
+            match change {
+                StagedChange::Created { path } =>  println!("created:   {path}"),
+                StagedChange::Modified { path } => println!("modified:  {path}"),
+                StagedChange::Deleted { path } =>  println!("deleted:   {path}"),
+            };
+        }
+    }
+    else {
+        println!("No changes staged for commit");
+    }
+
+    if !unstaged_changes.is_empty() {
+        println!("Changes not staged for commit:");
+        for change in unstaged_changes {
+            match change {
+                UnstagedChange::Created { path, .. } => println!("created:   {path}"),
+                UnstagedChange::Modified { path, ..} => println!("modified:  {path}"),
+                UnstagedChange::Deleted { path }     => println!("deleted:   {path}"),
+            };
+        }
+    }
+    else {
+        println!("No unstaged changes");
+    }
 
     Ok(())
 }
