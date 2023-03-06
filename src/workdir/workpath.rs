@@ -1,6 +1,6 @@
 use std::{ops::Deref, borrow::Borrow, path::{Path, PathBuf}, fmt, ffi::OsString};
 
-use crate::Error;
+use super::WorkDirError;
 
 #[repr(transparent)]
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -198,7 +198,7 @@ impl TryFrom<&str> for WorkPathBuf {
         let path = value.replace('\\', "/");
 
         if path.starts_with('/') || path.contains(':') {
-            return Err(Error::PathIsAbsolute.into());
+            return Err(WorkDirError::AbsolutePath(PathBuf::from(value)).into());
         }
 
         let normalized_path =
@@ -208,7 +208,10 @@ impl TryFrom<&str> for WorkPathBuf {
                     None
                 }
                 else if [".", "..", ".git"].contains(&part) {
-                    Some(Err(Error::ForbiddenPathComponent(part.to_owned())))
+                    Some(Err(WorkDirError::ForbiddenComponent {
+                        path: PathBuf::from(value),
+                        component: part.to_owned(),
+                    }))
                 }
                 else {
                     Some(Ok(part))
@@ -237,7 +240,7 @@ impl TryFrom<OsString> for WorkPathBuf {
             Self::try_from(value)
         }
         else {
-            Err(Error::InvalidUnicodePath(value).into())
+            Err(WorkDirError::InvalidUnicode(value).into())
         }
     }
 }
@@ -250,7 +253,7 @@ impl TryFrom<&Path> for WorkPathBuf {
             Self::try_from(path)
         }
         else {
-            Err(Error::InvalidPath.into())
+            Err(WorkDirError::InvalidUnicode(value.as_os_str().to_owned()).into())
         }
     }
 }

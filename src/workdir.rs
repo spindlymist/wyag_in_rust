@@ -4,7 +4,10 @@ use std::{
 };
 use path_absolutize::Absolutize;
 
-use crate::{Result, Error};
+use crate::Result;
+
+mod error;
+pub use error::WorkDirError;
 
 mod workpath;
 pub use workpath::WorkPath;
@@ -38,7 +41,7 @@ impl WorkDir {
         let abs_path = path.as_ref().absolutize()?;
         let rel_path = match abs_path.strip_prefix(&self.0) {
             Ok(val) => val,
-            Err(_) => return Err(Error::InvalidPath.into()),
+            Err(_) => return Err(WorkDirError::OutsideWorkingDir(path.as_ref().to_owned()).into()),
         };
 
         WorkPathBuf::try_from(rel_path)

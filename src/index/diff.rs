@@ -7,7 +7,7 @@ use crate::{
     Result,
     index::{Index, FileStats},
     workdir::{WorkDir, WorkPathBuf, WorkPath},
-    object::{GitObject, ObjectHash, Tree, ObjectFormat, TreeEntry}, Error,
+    object::{GitObject, ObjectHash, Tree, ObjectFormat, TreeEntry},
 };
 
 pub enum UnstagedChange {
@@ -64,8 +64,8 @@ impl Index {
             for entry in std::fs::read_dir(".")? {
                 let path = match WorkPathBuf::try_from(entry?.file_name()) {
                     Ok(val) => val,
-                    Err(err) => match err.downcast_ref::<Error>() {
-                        Some(Error::ForbiddenPathComponent(_)) => continue,
+                    Err(err) => match err.downcast_ref::<crate::workdir::WorkDirError>() {
+                        Some(crate::workdir::WorkDirError::ForbiddenComponent { .. }) => continue,
                         Some(_) | None => return Err(err),
                     },
                 };

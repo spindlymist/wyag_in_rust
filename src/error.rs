@@ -4,7 +4,6 @@ use std::{
     fmt,
     str,
     string,
-    ffi::OsString,
 };
 
 use crate::object::{ObjectHash, ObjectFormat};
@@ -13,12 +12,6 @@ pub type Result<T> = anyhow::Result<T>;
 
 #[derive(Debug)]
 pub enum Error {
-    // workdir/workpath
-    ForbiddenPathComponent(String),
-    InvalidUnicodePath(OsString),
-    PathIsAbsolute,
-    InvalidPath,
-
     // repo
     DirectoryNotInitialized,
     RepoFmtVersionMissing,
