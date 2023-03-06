@@ -30,7 +30,7 @@ use crate::Result;
 /// # Examples
 /// 
 /// ```
-/// use wyag::kvlm::kvlm_parse;
+/// use wyag::kvlm;
 /// 
 /// let input = "\
 /// name Robin
@@ -42,7 +42,7 @@ use crate::Result;
 /// This is my message.
 /// It has two lines.";
 /// 
-/// let map = kvlm_parse(input).expect("input should be valid");
+/// let map = kvlm::parse(input).expect("input should be valid");
 /// 
 /// assert_eq!( vec!["name", "address", "languages", ""], map.keys().collect::<Vec<&String>>() );
 /// assert_eq!( "Robin", map.get("name").unwrap() );
@@ -101,7 +101,7 @@ where
 /// # Examples
 /// 
 /// ```
-/// use wyag::kvlm::kvlm_serialize;
+/// use wyag::kvlm;
 /// 
 /// let mut map = ordered_multimap::ListOrderedMultimap::<String, String>::new();
 /// map.insert("name".to_owned(), "Robin".to_owned());
@@ -110,7 +110,7 @@ where
 /// map.append("languages".to_owned(), "Rust".to_owned());
 /// map.insert("".to_owned(), "This is my message.\nIt has two lines.".to_owned());
 /// 
-/// let serialized = kvlm_serialize(&map);
+/// let serialized = kvlm::serialize(&map);
 /// 
 /// assert_eq!(serialized, "\
 /// name Robin
@@ -143,7 +143,7 @@ pub fn serialize(kvlm: &ListOrderedMultimap<String, String>) -> String {
 
 #[derive(Error, Debug)]
 pub enum KvlmError {
-    #[error(r"The kvlm has no message (no blank line after list)")]
+    #[error("The kvlm has no message (no blank line after list)")]
     MissingMessage,
     #[error("The kvlm has an invalid entry (no space after key)")]
     InvalidEntry
