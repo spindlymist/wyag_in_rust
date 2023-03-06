@@ -49,17 +49,30 @@ impl TryFrom<&str> for ObjectHash {
         match base16ct::mixed::decode(value, &mut raw) {
             Ok(raw) => {
                 if raw.len() != 20 {
-                    return Err(ObjectError::InvalidHash {
+                    return Err(ObjectError::InvalidHashString {
                         hash_string: value.to_owned(),
                         problem: format!("expected 20 bytes, got {}", raw.len())
                     }.into());
                 }
             },
-            Err(_) => return Err(ObjectError::InvalidHash {
+            Err(_) => return Err(ObjectError::InvalidHashString {
                 hash_string: value.to_owned(),
                 problem: "not hexadecimal".to_owned(),
             }.into()),
         };
+
+        Ok(ObjectHash { raw })
+    }
+}
+
+impl TryFrom<&[u8]> for ObjectHash {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        let raw: [u8; 20] = value.try_into()
+            .map_err(|_| ObjectError::InvalidHashBytes {
+                bytes: value.to_owned()
+            })?;
 
         Ok(ObjectHash { raw })
     }

@@ -7,7 +7,6 @@ use std::{
 use clap::{Parser, Subcommand, Args};
 
 use crate::{
-    Error,
     Result,
     repo::{Repository, RepoError},
     object::{
@@ -302,10 +301,7 @@ pub struct LsTreeArgs {
 pub fn cmd_ls_tree(args: LsTreeArgs) -> Result<()> {
     let repo = Repository::find(".")?;
     let hash = GitObject::find(repo.workdir(), &args.object)?;
-    let tree = match GitObject::read(repo.workdir(), &hash)? {
-        GitObject::Tree(tree) => tree,
-        _ => return Err(Error::ObjectNotTree.into()),
-    };
+    let tree = Tree::read(repo.workdir(), &hash)?;
 
     for (path, entry) in &tree.entries {
         let object = GitObject::read(repo.workdir(), &entry.hash)?;

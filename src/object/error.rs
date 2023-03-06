@@ -24,8 +24,12 @@ pub enum ObjectError {
         matches: Vec<ObjectHash>,
     },
     #[error("Invalid hash `{hash_string}`: {problem}")]
-    InvalidHash {
+    InvalidHashString {
         hash_string: String,
         problem: String,
+    },
+    #[error("Invalid hash bytes: {bytes:?}")]
+    InvalidHashBytes {
+        bytes: Vec<u8>,
     }
 }

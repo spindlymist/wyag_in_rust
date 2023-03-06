@@ -2,7 +2,9 @@ use std::{
     path::Path, collections::{HashSet, BTreeMap}
 };
 
-use crate::{Error, Result, workdir::{WorkDir, WorkPathBuf, WorkPath}, index::Index};
+use anyhow::{bail, Context};
+
+use crate::{Result, workdir::{WorkDir, WorkPathBuf, WorkPath}, index::Index};
 use super::{ObjectError, ObjectHash, ObjectFormat, GitObject};
 
 pub struct Tree {
@@ -31,7 +33,7 @@ impl Tree {
                     std::fs::create_dir(&object_path)?;
                     tree.checkout(wd, object_path)?;
                 },
-                _ => return Err(Error::BadTreeFormat.into()),
+                object => bail!("Failed to parse tree (expected tree or blob, got {})", object.get_format()),
             };
         }
 
@@ -112,7 +114,7 @@ impl Tree {
 
     pub fn read_from_commit(wd: &WorkDir, commit_hash: &ObjectHash) -> Result<Tree> {
         let commit = super::Commit::read(wd, commit_hash)?;
-        
+
         Self::read(wd, commit.tree())
     }
 
@@ -141,13 +143,12 @@ impl Tree {
             };
 
             let hash = {
-                let hash_bytes: Vec<u8> = iter.by_ref().take(20).collect();
-                let hash: [u8; 20] = match hash_bytes.try_into() {
-                    Ok(val) => val,
-                    Err(_) => return Err(Error::BadTreeFormat.into()),
-                };
+                let hash_bytes: Vec<u8> = iter.by_ref()
+                    .take(20)
+                    .collect();
 
-                ObjectHash { raw: hash }
+                ObjectHash::try_from(&hash_bytes[..])
+                    .context("Failed to parse tree (invalid hash)")?
             };
 
             entries.insert(path, TreeEntry {

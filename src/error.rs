@@ -10,10 +10,6 @@ pub type Result<T> = anyhow::Result<T>;
 
 #[derive(Debug)]
 pub enum Error {
-    // tree
-    ObjectNotTree,
-    BadTreeFormat,
-
     // common
     Io(io::Error),
     Ini(ini::Error),
