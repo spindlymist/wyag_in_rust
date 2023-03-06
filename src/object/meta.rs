@@ -14,12 +14,12 @@ impl ObjectMetadata {
     pub fn new(repo: &Repository, message: String) -> Result<ObjectMetadata> {
         let author_name = match repo.get_config("user", "name") {
             Some(val) => val.to_owned(),
-            None => return Err(Error::MissingConfig("No user name configured".to_owned())),
+            None => return Err(Error::MissingConfig("No user name configured".to_owned()).into()),
         };
 
         let author_email = match repo.get_config("user", "email") {
             Some(val) => val.to_owned(),
-            None => return Err(Error::MissingConfig("No user email configured".to_owned())),
+            None => return Err(Error::MissingConfig("No user email configured".to_owned()).into()),
         };
 
         Ok(ObjectMetadata {

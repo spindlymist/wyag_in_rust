@@ -37,7 +37,7 @@ where
     let ref_contents = match fs::read_to_string(abs_path) {
         Ok(val) => val,
         Err(err) => match err.kind() {
-            io::ErrorKind::NotFound => return Err(Error::InvalidRef),
+            io::ErrorKind::NotFound => return Err(Error::InvalidRef.into()),
             _ => return Err(err.into()),
         },
     };

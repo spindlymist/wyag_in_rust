@@ -31,7 +31,7 @@ impl Tree {
                     std::fs::create_dir(&object_path)?;
                     tree.checkout(wd, object_path)?;
                 },
-                _ => return Err(Error::BadTreeFormat),
+                _ => return Err(Error::BadTreeFormat.into()),
             };
         }
 
@@ -103,7 +103,7 @@ impl Tree {
     pub fn read(wd: &WorkDir, hash: &ObjectHash) -> Result<Tree> {
         match GitObject::read(wd, hash)? {
             GitObject::Tree(tree) => Ok(tree),
-            object => Err(Error::UnexpectedObjectFormat(object.get_format())),
+            object => Err(Error::UnexpectedObjectFormat(object.get_format()).into()),
         }
     }
 
@@ -112,7 +112,7 @@ impl Tree {
 
         let tree_hash = match commit.map.get("tree") {
             Some(val) => ObjectHash::try_from(&val[..])?,
-            None => return Err(Error::BadCommitFormat),
+            None => return Err(Error::BadCommitFormat.into()),
         };
 
         Self::read(wd, &tree_hash)
@@ -146,7 +146,7 @@ impl Tree {
                 let hash_bytes: Vec<u8> = iter.by_ref().take(20).collect();
                 let hash: [u8; 20] = match hash_bytes.try_into() {
                     Ok(val) => val,
-                    Err(_) => return Err(Error::BadTreeFormat),
+                    Err(_) => return Err(Error::BadTreeFormat.into()),
                 };
 
                 ObjectHash { raw: hash }

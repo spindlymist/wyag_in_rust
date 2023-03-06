@@ -192,13 +192,13 @@ impl From<&WorkPath> for WorkPathBuf {
 }
 
 impl TryFrom<&str> for WorkPathBuf {
-    type Error = Error;
+    type Error = anyhow::Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let path = value.replace('\\', "/");
 
         if path.starts_with('/') || path.contains(':') {
-            return Err(Error::PathIsAbsolute);
+            return Err(Error::PathIsAbsolute.into());
         }
 
         let normalized_path =
@@ -222,7 +222,7 @@ impl TryFrom<&str> for WorkPathBuf {
 }
 
 impl TryFrom<String> for WorkPathBuf {
-    type Error = Error;
+    type Error = anyhow::Error;
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         Self::try_from(value.as_str())
@@ -230,33 +230,33 @@ impl TryFrom<String> for WorkPathBuf {
 }
 
 impl TryFrom<OsString> for WorkPathBuf {
-    type Error = Error;
+    type Error = anyhow::Error;
 
     fn try_from(value: OsString) -> Result<Self, Self::Error> {
         if let Some(value) = value.to_str() {
             Self::try_from(value)
         }
         else {
-            Err(Error::InvalidUnicodePath(value))
+            Err(Error::InvalidUnicodePath(value).into())
         }
     }
 }
 
 impl TryFrom<&Path> for WorkPathBuf {
-    type Error = Error;
+    type Error = anyhow::Error;
 
     fn try_from(value: &Path) -> Result<Self, Self::Error> {
         if let Some(path) = value.to_str() {
             Self::try_from(path)
         }
         else {
-            Err(Error::InvalidPath)
+            Err(Error::InvalidPath.into())
         }
     }
 }
 
 impl TryFrom<PathBuf> for WorkPathBuf {
-    type Error = Error;
+    type Error = anyhow::Error;
 
     fn try_from(value: PathBuf) -> Result<Self, Self::Error> {
         Self::try_from(value.as_path())
@@ -264,7 +264,7 @@ impl TryFrom<PathBuf> for WorkPathBuf {
 }
 
 impl TryFrom<&[u8]> for WorkPathBuf {
-    type Error = Error;
+    type Error = anyhow::Error;
 
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         let path = std::str::from_utf8(value)?;

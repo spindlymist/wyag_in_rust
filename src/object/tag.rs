@@ -51,7 +51,7 @@ impl Tag {
     pub fn deserialize(data: Vec<u8>) -> Result<Tag> {
         let data = match String::from_utf8(data) {
             Ok(data) => data,
-            Err(_) => return Err(Error::BadKVLMFormat),
+            Err(_) => return Err(Error::BadKVLMFormat.into()),
         };
         let map = crate::kvlm::parse(&data)?;
 

@@ -162,19 +162,19 @@ pub fn cmd_checkout(args: CheckoutArgs) -> Result<()> {
     if let GitObject::Commit(commit) = object {
         let tree_hash = match commit.map.get("tree") {
             Some(val) => ObjectHash::try_from(&val[..])?,
-            None => return Err(Error::BadCommitFormat),
+            None => return Err(Error::BadCommitFormat.into()),
         };
         object = GitObject::read(repo.workdir(), &tree_hash)?;
     }
     
     if let GitObject::Tree(tree) = object {
         if args.path.is_file() {
-            return Err(Error::InitPathIsFile);
+            return Err(Error::InitPathIsFile.into());
         }
         else if args.path.is_dir()
              && args.path.read_dir()?.next().is_some()
         {
-            return Err(Error::InitDirectoryNotEmpty);
+            return Err(Error::InitDirectoryNotEmpty.into());
         }
         else {
             std::fs::create_dir(&args.path)?;
@@ -183,7 +183,7 @@ pub fn cmd_checkout(args: CheckoutArgs) -> Result<()> {
         tree.checkout(repo.workdir(), args.path)
     }
     else {
-        Err(Error::ObjectNotTree)
+        Err(Error::ObjectNotTree.into())
     }
 }
 
@@ -289,7 +289,7 @@ fn log_graphviz(wd: &WorkDir, hash: &ObjectHash, seen: &mut HashSet<ObjectHash>)
         Ok(())
     }
     else {
-        Err(Error::NonCommitInGraph)
+        Err(Error::NonCommitInGraph.into())
     }
 }
 
@@ -326,7 +326,7 @@ pub fn cmd_ls_tree(args: LsTreeArgs) -> Result<()> {
     let hash = GitObject::find(repo.workdir(), &args.object)?;
     let tree = match GitObject::read(repo.workdir(), &hash)? {
         GitObject::Tree(tree) => tree,
-        _ => return Err(Error::ObjectNotTree),
+        _ => return Err(Error::ObjectNotTree.into()),
     };
 
     for (path, entry) in &tree.entries {
@@ -368,10 +368,11 @@ pub fn cmd_rev_parse(args: RevParseArgs) -> Result<()> {
     let repo = Repository::find(".")?;
     let hashes = match GitObject::find(repo.workdir(), &args.name) {
         Ok(hash) => vec![hash],
-        Err(err) => match err {
-            Error::BadObjectId => vec![],
-            Error::AmbiguousObjectId(candidates) => candidates,
-            _ => return Err(err),
+        Err(err) => match err.downcast::<Error>() {
+            Ok(Error::BadObjectId) => vec![],
+            Ok(Error::AmbiguousObjectId(candidates)) => candidates,
+            Ok(err) => return Err(err.into()),
+            Err(err) => return Err(err),
         },
     };
 

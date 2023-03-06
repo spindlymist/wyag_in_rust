@@ -18,10 +18,6 @@ impl WorkDir {
     where
         P: AsRef<Path>
     {
-        if path.as_ref().is_file() {
-            return Err(Error::WorkingDirectoryInvalid);
-        }
-
         Ok(Self(
             path.as_ref().absolutize()?.into()
         ))
@@ -42,7 +38,7 @@ impl WorkDir {
         let abs_path = path.as_ref().absolutize()?;
         let rel_path = match abs_path.strip_prefix(&self.0) {
             Ok(val) => val,
-            Err(_) => return Err(Error::InvalidPath),
+            Err(_) => return Err(Error::InvalidPath.into()),
         };
 
         WorkPathBuf::try_from(rel_path)
@@ -99,7 +95,7 @@ impl WorkDir {
 }
 
 impl TryFrom<PathBuf> for WorkDir {
-    type Error = Error;
+    type Error = anyhow::Error;
 
     fn try_from(value: PathBuf) -> Result<Self> {
         WorkDir::new(value)
@@ -107,7 +103,7 @@ impl TryFrom<PathBuf> for WorkDir {
 }
 
 impl TryFrom<&Path> for WorkDir {
-    type Error = Error;
+    type Error = anyhow::Error;
 
     fn try_from(value: &Path) -> Result<Self> {
         WorkDir::new(value)
@@ -115,7 +111,7 @@ impl TryFrom<&Path> for WorkDir {
 }
 
 impl TryFrom<String> for WorkDir {
-    type Error = Error;
+    type Error = anyhow::Error;
 
     fn try_from(value: String) -> Result<Self> {
         WorkDir::new(value)
@@ -123,7 +119,7 @@ impl TryFrom<String> for WorkDir {
 }
 
 impl TryFrom<&str> for WorkDir {
-    type Error = Error;
+    type Error = anyhow::Error;
 
     fn try_from(value: &str) -> Result<Self> {
         WorkDir::new(value)

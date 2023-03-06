@@ -27,10 +27,13 @@ impl Repository {
             let workdir = WorkDir::new(dir)?;
 
             // Validate working directory
-            if workdir.as_path().is_dir()
+            if workdir.as_path().is_file() {
+                return Err(Error::InitPathIsFile.into());
+            }
+            else if workdir.as_path().is_dir()
                 && workdir.as_path().read_dir()?.next().is_some()
             {
-                return Err(Error::InitDirectoryNotEmpty);
+                return Err(Error::InitDirectoryNotEmpty.into());
             }
             
             // Initialize config
@@ -79,7 +82,7 @@ impl Repository {
     {
         let workdir = WorkDir::new(dir)?;
         if !workdir.git_path(".").is_dir() {
-            return Err(Error::DirectoryNotInitialized);
+            return Err(Error::DirectoryNotInitialized.into());
         }
 
         let config_file = workdir.git_path("config");
@@ -87,8 +90,8 @@ impl Repository {
 
         match config.get_from(Some("core"), "repositoryformatversion") {
             Some("0") => (),
-            Some(version) => return Err(Error::UnsupportedRepoFmtVersion(version.to_owned())),
-            None => return Err(Error::RepoFmtVersionMissing),
+            Some(version) => return Err(Error::UnsupportedRepoFmtVersion(version.to_owned()).into()),
+            None => return Err(Error::RepoFmtVersionMissing.into()),
         };
 
         Ok(Repository {
@@ -116,7 +119,7 @@ impl Repository {
         }
         else {
             // Reached root without finding a .git directory
-            Err(Error::DirectoryNotInitialized)
+            Err(Error::DirectoryNotInitialized.into())
         }
     }
 

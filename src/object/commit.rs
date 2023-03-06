@@ -39,14 +39,14 @@ impl Commit {
     pub fn read(wd: &WorkDir, hash: &ObjectHash) -> Result<Commit> {
         match GitObject::read(wd, hash)? {
             GitObject::Commit(commit) => Ok(commit),
-            object => Err(Error::UnexpectedObjectFormat(object.get_format())),
+            object => Err(Error::UnexpectedObjectFormat(object.get_format()).into()),
         }
     }
     
     pub fn deserialize(data: Vec<u8>) -> Result<Commit> {
         let data = match String::from_utf8(data) {
             Ok(data) => data,
-            Err(_) => return Err(Error::BadKVLMFormat),
+            Err(_) => return Err(Error::BadKVLMFormat.into()),
         };
         let map = crate::kvlm::parse(&data)?;
 

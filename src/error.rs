@@ -3,45 +3,68 @@ use std::{
     io,
     fmt,
     str,
-    string, ffi::OsString,
+    string,
+    ffi::OsString,
 };
 
 use crate::object::{ObjectHash, ObjectFormat};
 
-pub type Result<T> = core::result::Result<T, Error>;
+pub type Result<T> = anyhow::Result<T>;
 
 #[derive(Debug)]
 pub enum Error {
-    WorkingDirectoryInvalid,
+    // workdir/workpath
+    ForbiddenPathComponent(String),
+    InvalidUnicodePath(OsString),
+    PathIsAbsolute,
+    InvalidPath,
+
+    // repo
     DirectoryNotInitialized,
     RepoFmtVersionMissing,
     UnsupportedRepoFmtVersion(String),
     InitPathIsFile,
     InitDirectoryNotEmpty,
+    
+    // object
     InvalidObjectHeader(String),
-    InvalidObjectHash,
     UnrecognizedObjectFormat,
-    NonCommitInGraph,
-    ObjectNotTree,
-    BadKVLMFormat,
-    BadTreeFormat,
-    BadCommitFormat,
     BadObjectId,
     AmbiguousObjectId(Vec<ObjectHash>),
+    UnexpectedObjectFormat(ObjectFormat),
+
+    // hash
+    InvalidObjectHash,
+    
+    // kvlm
+    BadKVLMFormat,
+
+    // meta
+    MissingConfig(String),
+
+    // commit
+    NonCommitInGraph,
+    BadCommitFormat,
+
+    // tree
+    ObjectNotTree,
+    BadTreeFormat,
+
+    // index
     BadIndexFormat(String),
     IndexHasExtensions,
-    InvalidPath,
+    UncommittedChanges,
+    
+    // refs
     InvalidRef,
+    
+    // branches
     BranchAlreadyExists,
-    UnrecognizedHeadRef,
-    MissingConfig(String),
     BranchIsCheckedOut,
     BranchPossiblyUnmerged,
-    UnexpectedObjectFormat(ObjectFormat),
-    ForbiddenPathComponent(String),
-    PathIsAbsolute,
-    UncommittedChanges,
-    InvalidUnicodePath(OsString),
+    UnrecognizedHeadRef,
+
+    // common
     Io(io::Error),
     Ini(ini::Error),
     Utf8(str::Utf8Error),

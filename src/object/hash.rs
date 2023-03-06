@@ -41,7 +41,7 @@ impl std::fmt::Display for ObjectHash {
 }
 
 impl TryFrom<&str> for ObjectHash {
-    type Error = Error;
+    type Error = anyhow::Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let mut raw = [0u8; 20];
@@ -49,10 +49,10 @@ impl TryFrom<&str> for ObjectHash {
         match base16ct::mixed::decode(value, &mut raw) {
             Ok(raw) => {
                 if raw.len() != 20 {
-                    return Err(Error::InvalidObjectHash);
+                    return Err(Error::InvalidObjectHash.into());
                 }
             },
-            Err(_) => return Err(Error::InvalidObjectHash),
+            Err(_) => return Err(Error::InvalidObjectHash.into()),
         };
 
         Ok(ObjectHash { raw })

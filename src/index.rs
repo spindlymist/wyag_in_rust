@@ -71,14 +71,14 @@ impl Index {
             reader.read_exact(&mut signature)?;
 
             if signature != Self::INDEX_SIGNATURE {
-                return Err(Error::BadIndexFormat("Invalid signature".to_owned()));
+                return Err(Error::BadIndexFormat("Invalid signature".to_owned()).into());
             }
         }
 
         // Signature is followed by version number
         let version = reader.read_u32::<BigEndian>()?;
         if version > 3 {
-            return Err(Error::BadIndexFormat(format!("Unsupported version: {version}")));
+            return Err(Error::BadIndexFormat(format!("Unsupported version: {version}")).into());
         }
 
         // Version number is followed by the number of entries
@@ -152,7 +152,7 @@ impl Index {
             let mut bytes = vec![];
             if reader.read_until(0, &mut bytes)? < 2 {
                 // should have read at least one byte + null terminator
-                return Err(Error::BadIndexFormat("Path is missing".to_owned()));
+                return Err(Error::BadIndexFormat("Path is missing".to_owned()).into());
             }
 
             let bytes = &bytes[..bytes.len() - 1]; // drop the null terminator
@@ -325,7 +325,7 @@ impl Index {
         {
             let unstaged_changes = self.list_unstaged_changes(wd, &path, false)?;
             if !unstaged_changes.is_empty() {
-                return Err(Error::UncommittedChanges);
+                return Err(Error::UncommittedChanges.into());
             }
         }
 
@@ -333,7 +333,7 @@ impl Index {
             let commit_hash = branch::get_current(wd)?.tip(wd)?;
             let staged_changes = self.list_staged_changes(wd, &commit_hash, &path)?;
             if !staged_changes.is_empty() {
-                return Err(Error::UncommittedChanges);
+                return Err(Error::UncommittedChanges.into());
             }
         }
 

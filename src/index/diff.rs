@@ -64,9 +64,9 @@ impl Index {
             for entry in std::fs::read_dir(".")? {
                 let path = match WorkPathBuf::try_from(entry?.file_name()) {
                     Ok(val) => val,
-                    Err(err) => match err {
-                        Error::ForbiddenPathComponent(_) => continue,
-                        _ => return Err(err),
+                    Err(err) => match err.downcast_ref::<Error>() {
+                        Some(Error::ForbiddenPathComponent(_)) => continue,
+                        Some(_) | None => return Err(err),
                     },
                 };
                 self.unstaged_compare_path(wd, path, &mut changes, &mut expected, write)?;

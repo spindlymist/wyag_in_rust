@@ -104,9 +104,9 @@ impl GitObject {
         let candidates = Self::resolve(wd, id)?;
 
         match candidates.len() {
-            0 => Err(Error::BadObjectId),
+            0 => Err(Error::BadObjectId.into()),
             1 => Ok(candidates[0]),
-            _ => Err(Error::AmbiguousObjectId(candidates)),
+            _ => Err(Error::AmbiguousObjectId(candidates).into()),
         }
     }
 
@@ -184,17 +184,17 @@ impl GitObject {
 
             let header = match str::from_utf8(&header) {
                 Ok(val) => val,
-                Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: couldn't parse header"))),
+                Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: couldn't parse header")).into()),
             };
 
             let (format, size) = match header.split_once(' ') {
                 Some((left, right)) => (ObjectFormat::try_from(left)?, right),
-                None => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: not enough parts"))),
+                None => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: not enough parts")).into()),
             };
 
             let size = match str::parse(size) {
                 Ok(val) => val,
-                Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: invalid length"))),
+                Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: invalid length")).into()),
             };
 
             (format, size)
@@ -203,7 +203,7 @@ impl GitObject {
         // Validate size
         let data: Vec<u8> = iter.collect();
         if data.len() != size {
-            return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: incorrect length")));
+            return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: incorrect length")).into());
         }
 
         Self::deserialize(data, format)

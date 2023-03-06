@@ -9,6 +9,7 @@ license = "Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.69"
 base16ct = { version = "0.1.1", features = ["alloc"] }
 byteorder = "1.4.3"
 clap = { version = "4.1.0", features = ["derive"] }
@@ -19,3 +20,4 @@ path-absolutize = "3.0.14"
 regex = "1.7.1"
 rust-ini = "0.18.0"
 sha1 = "0.10.5"
+thiserror = "1.0.39"
