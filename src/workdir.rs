@@ -30,6 +30,22 @@ impl WorkDir {
         &self.0
     }
 
+    pub fn is_valid_path<P>(path: P) -> Result<bool>
+    where
+        P: AsRef<Path>
+    {
+        if path.as_ref().is_file() {
+            Ok(false)
+        }
+        else if path.as_ref().is_dir() {
+            let is_empty = path.as_ref().read_dir()?.next().is_none();
+            Ok(is_empty)
+        }
+        else {
+            Ok(true)
+        }
+    }
+
     /// Translates a path within the repo to its canonical name.
     /// 
     /// The canonical name is relative to the working directory, uses `/` for the path separator,

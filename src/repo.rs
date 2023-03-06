@@ -1,13 +1,13 @@
 use std::{
-    path::Path,
+    path::{Path, PathBuf},
     fs::{self, OpenOptions},
     io::Write,
 };
 use ini::Ini;
 use path_absolutize::Absolutize;
+use thiserror::Error;
 
 use crate::{
-    Error,
     Result,
     workdir::WorkDir,
 };
@@ -24,17 +24,10 @@ impl Repository {
         P: AsRef<Path>
     {
         let repo = {
+            if !WorkDir::is_valid_path(&dir)? {
+                return Err(RepoError::InitPathExists(dir.as_ref().to_owned()).into());
+            }
             let workdir = WorkDir::new(dir)?;
-
-            // Validate working directory
-            if workdir.as_path().is_file() {
-                return Err(Error::InitPathIsFile.into());
-            }
-            else if workdir.as_path().is_dir()
-                && workdir.as_path().read_dir()?.next().is_some()
-            {
-                return Err(Error::InitDirectoryNotEmpty.into());
-            }
             
             // Initialize config
             let mut config = Ini::new();
@@ -80,18 +73,18 @@ impl Repository {
     where
         P: AsRef<Path>
     {
-        let workdir = WorkDir::new(dir)?;
-        if !workdir.git_path(".").is_dir() {
-            return Err(Error::DirectoryNotInitialized.into());
+        if !dir.as_ref().is_dir() {
+            return Err(RepoError::UninitializedDirectory(dir.as_ref().to_owned()).into());
         }
+        let workdir = WorkDir::new(dir)?;
 
         let config_file = workdir.git_path("config");
         let config = Ini::load_from_file(config_file)?;
 
         match config.get_from(Some("core"), "repositoryformatversion") {
             Some("0") => (),
-            Some(version) => return Err(Error::UnsupportedRepoFmtVersion(version.to_owned()).into()),
-            None => return Err(Error::RepoFmtVersionMissing.into()),
+            Some(version) => return Err(RepoError::FmtVersionUnsupported(version.to_owned()).into()),
+            None => return Err(RepoError::FmtVersionMissing.into()),
         };
 
         Ok(Repository {
@@ -119,7 +112,7 @@ impl Repository {
         }
         else {
             // Reached root without finding a .git directory
-            Err(Error::DirectoryNotInitialized.into())
+            Err(RepoError::UninitializedDirectory(path.as_ref().to_owned()).into())
         }
     }
 
@@ -136,4 +129,16 @@ impl Repository {
         &self.workdir
     }
 
+}
+
+#[derive(Error, Debug)]
+pub enum RepoError {
+    #[error("Could not initialize repo at `{0:?}` because a file or nonempty directory exists there")]
+    InitPathExists(PathBuf),
+    #[error("No git repo contains `{0:?}`")]
+    UninitializedDirectory(PathBuf),
+    #[error("No repo format version was specified")]
+    FmtVersionMissing,
+    #[error("Repo format version `{0}` is not supported")]
+    FmtVersionUnsupported(String),
 }

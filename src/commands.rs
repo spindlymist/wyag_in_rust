@@ -9,14 +9,14 @@ use clap::{Parser, Subcommand, Args};
 use crate::{
     Error,
     Result,
-    repo::Repository,
+    repo::{Repository, RepoError},
     object::{
         GitObject,
         ObjectHash,
         ObjectFormat,
         Commit,
         Tag,
-        ObjectMetadata,
+        ObjectMetadata, Tree,
     },
     refs,
     index::{Index, UnstagedChange, StagedChange},
@@ -155,36 +155,16 @@ pub struct CheckoutArgs {
 }
 
 pub fn cmd_checkout(args: CheckoutArgs) -> Result<()> {
+    if !WorkDir::is_valid_path(&args.path)? {
+        return Err(RepoError::InitPathExists(args.path).into());
+    }
+
     let repo = Repository::find(".")?;
     let hash = GitObject::find(repo.workdir(), &args.commit)?;
-    let mut object = GitObject::read(repo.workdir(), &hash)?;
-    
-    if let GitObject::Commit(commit) = object {
-        let tree_hash = match commit.map.get("tree") {
-            Some(val) => ObjectHash::try_from(&val[..])?,
-            None => return Err(Error::BadCommitFormat.into()),
-        };
-        object = GitObject::read(repo.workdir(), &tree_hash)?;
-    }
-    
-    if let GitObject::Tree(tree) = object {
-        if args.path.is_file() {
-            return Err(Error::InitPathIsFile.into());
-        }
-        else if args.path.is_dir()
-             && args.path.read_dir()?.next().is_some()
-        {
-            return Err(Error::InitDirectoryNotEmpty.into());
-        }
-        else {
-            std::fs::create_dir(&args.path)?;
-        }
+    let tree = Tree::read_from_commit(repo.workdir(), &hash)?;
 
-        tree.checkout(repo.workdir(), args.path)
-    }
-    else {
-        Err(Error::ObjectNotTree.into())
-    }
+    std::fs::create_dir(&args.path)?;
+    tree.checkout(repo.workdir(), args.path)
 }
 
 /// Commits staged changes to the current branch.

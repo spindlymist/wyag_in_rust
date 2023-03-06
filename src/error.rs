@@ -12,13 +12,6 @@ pub type Result<T> = anyhow::Result<T>;
 
 #[derive(Debug)]
 pub enum Error {
-    // repo
-    DirectoryNotInitialized,
-    RepoFmtVersionMissing,
-    UnsupportedRepoFmtVersion(String),
-    InitPathIsFile,
-    InitDirectoryNotEmpty,
-    
     // object
     InvalidObjectHeader(String),
     UnrecognizedObjectFormat,
