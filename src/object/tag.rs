@@ -1,7 +1,7 @@
+use anyhow::Context;
 use ordered_multimap::ListOrderedMultimap;
 
 use crate::{
-    Error,
     Result,
     workdir::WorkDir,
     refs,
@@ -49,11 +49,9 @@ impl Tag {
     }
 
     pub fn deserialize(data: Vec<u8>) -> Result<Tag> {
-        let data = match String::from_utf8(data) {
-            Ok(data) => data,
-            Err(_) => return Err(Error::BadKVLMFormat.into()),
-        };
-        let map = crate::kvlm::parse(&data)?;
+        let data = std::str::from_utf8(&data)
+            .context("Failed to parse tag")?;
+        let map = crate::kvlm::parse(data)?;
 
         Ok(Tag {
             map,

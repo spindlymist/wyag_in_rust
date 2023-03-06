@@ -1,7 +1,7 @@
+use anyhow::Context;
 use ordered_multimap::ListOrderedMultimap;
 
 use crate::{
-    Error,
     Result,
     workdir::WorkDir,
     index::Index,
@@ -47,11 +47,9 @@ impl Commit {
     }
     
     pub fn deserialize(data: Vec<u8>) -> Result<Commit> {
-        let data = match String::from_utf8(data) {
-            Ok(data) => data,
-            Err(_) => return Err(Error::BadKVLMFormat.into()),
-        };
-        let map = crate::kvlm::parse(&data)?;
+        let data = std::str::from_utf8(&data)
+            .context("Failed to parse commit")?;
+        let map = crate::kvlm::parse(data)?;
 
         Ok(Commit {
             map,

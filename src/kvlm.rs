@@ -1,7 +1,8 @@
 use ordered_multimap::ListOrderedMultimap;
 use itertools::Itertools;
+use thiserror::Error;
 
-use crate::error::Error;
+use crate::Result;
 
 /// Parses a "key value list with message" into a map. The message is stored under the blank key `""`.
 /// 
@@ -49,16 +50,16 @@ use crate::error::Error;
 /// assert_eq!( vec!["English", "Rust"], map.get_all("languages").collect::<Vec<&String>>() );
 /// assert_eq!( "This is my message.\nIt has two lines.", map.get("").unwrap() );
 /// ```
-pub fn parse(data: &str) -> Result<ListOrderedMultimap<String, String>, Error> {
+pub fn parse(data: &str) -> Result<ListOrderedMultimap<String, String>> {
     let mut map = ListOrderedMultimap::new();
 
     let (header, message) = match data.split_once("\n\n") {
         Some((header, message)) => (header, message),
-        None => return Err(Error::BadKVLMFormat),
+        None => return Err(KvlmError::MissingMessage.into()),
     };
     let mut header_lines = header.lines();
     
-    while let Some((key, value)) = next_entry(&mut header_lines) {
+    while let Some((key, value)) = next_entry(&mut header_lines)? {
         map.append(key, value);
     }
 
@@ -67,23 +68,30 @@ pub fn parse(data: &str) -> Result<ListOrderedMultimap<String, String>, Error> {
     Ok(map)
 }
 
-fn next_entry<'a, I>(lines: &mut I) -> Option<(String, String)>
+fn next_entry<'a, I>(lines: &mut I) -> Result<Option<(String, String)>>
 where
     I: Iterator<Item = &'a str> + Clone
 {
-    let first_line = lines.next()?;
-    let (key, first_value_line) = first_line.split_once(' ')?;
+    let first_line = match lines.next() {
+        Some(val) => val,
+        None => return Ok(None),
+    };
+
+    let (key, first_value_line) = match first_line.split_once(' ') {
+        Some(val) => val,
+        None => return Err(KvlmError::InvalidEntry.into()),
+    };
 
     let mut value_lines = vec![first_value_line];
     value_lines.extend(
         lines.take_while_ref(|line| line.starts_with(' '))
-        .map(|line| &line[1..])
+            .map(|line| &line[1..])
     );
 
-    Some((
+    Ok(Some((
         String::from(key),
         value_lines.join("\n"),
-    ))
+    )))
 }
 
 /// Serializes a ListOrderedMultimap into a "key value list with message."
@@ -131,4 +139,12 @@ pub fn serialize(kvlm: &ListOrderedMultimap<String, String>) -> String {
     };
 
     format!("{header}\n\n{message}")
+}
+
+#[derive(Error, Debug)]
+pub enum KvlmError {
+    #[error(r"The kvlm has no message (no blank line after list)")]
+    MissingMessage,
+    #[error("The kvlm has an invalid entry (no space after key)")]
+    InvalidEntry
 }
