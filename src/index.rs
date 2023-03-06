@@ -5,15 +5,18 @@ use std::{
     collections::BTreeMap,
 };
 
+use anyhow::Context;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use path_absolutize::Absolutize;
 
 use crate::{
-    Error,
     Result,
     object::ObjectHash,
     workdir::{WorkDir, WorkPathBuf, WorkPath}, branch,
 };
+
+mod error;
+pub use error::IndexError;
 
 pub mod flags;
 pub use flags::EntryFlags;
@@ -71,14 +74,16 @@ impl Index {
             reader.read_exact(&mut signature)?;
 
             if signature != Self::INDEX_SIGNATURE {
-                return Err(Error::BadIndexFormat("Invalid signature".to_owned()).into());
+                return Err(IndexError::Corrupt {
+                    problem: format!("invalid signature {signature:?} (expected {:?})", Self::INDEX_SIGNATURE),
+                }.into());
             }
         }
 
         // Signature is followed by version number
         let version = reader.read_u32::<BigEndian>()?;
         if version > 3 {
-            return Err(Error::BadIndexFormat(format!("Unsupported version: {version}")).into());
+            return Err(IndexError::UnsupportedVersion(version).into());
         }
 
         // Version number is followed by the number of entries
@@ -152,12 +157,15 @@ impl Index {
             let mut bytes = vec![];
             if reader.read_until(0, &mut bytes)? < 2 {
                 // should have read at least one byte + null terminator
-                return Err(Error::BadIndexFormat("Path is missing".to_owned()).into());
+                return Err(IndexError::Corrupt {
+                    problem: "empty path".to_owned()
+                }.into());
             }
 
             let bytes = &bytes[..bytes.len() - 1]; // drop the null terminator
             
-            WorkPathBuf::try_from(bytes)?
+            WorkPathBuf::try_from(bytes)
+                .with_context(|| "Invalid path in index".to_owned())?
         };
 
         // Each entry ends with 0-7 additional NULL bytes to maintain 8-byte alignment
@@ -325,7 +333,7 @@ impl Index {
         {
             let unstaged_changes = self.list_unstaged_changes(wd, &path, false)?;
             if !unstaged_changes.is_empty() {
-                return Err(Error::UncommittedChanges.into());
+                return Err(IndexError::UncommittedChanges.into());
             }
         }
 
@@ -333,7 +341,7 @@ impl Index {
             let commit_hash = branch::get_current(wd)?.tip(wd)?;
             let staged_changes = self.list_staged_changes(wd, &commit_hash, &path)?;
             if !staged_changes.is_empty() {
-                return Err(Error::UncommittedChanges.into());
+                return Err(IndexError::UncommittedChanges.into());
             }
         }
 

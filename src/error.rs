@@ -24,11 +24,6 @@ pub enum Error {
     ObjectNotTree,
     BadTreeFormat,
 
-    // index
-    BadIndexFormat(String),
-    IndexHasExtensions,
-    UncommittedChanges,
-
     // common
     Io(io::Error),
     Ini(ini::Error),
