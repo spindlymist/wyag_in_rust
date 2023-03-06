@@ -2,9 +2,7 @@ mod commands;
 use commands::*;
 pub use commands::Cli;
 
-pub mod error;
-pub use error::Error;
-pub use error::Result;
+pub type Result<T> = anyhow::Result<T>;
 
 pub mod repo;
 pub mod object;
