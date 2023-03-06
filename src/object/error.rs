@@ -23,4 +23,9 @@ pub enum ObjectError {
         id: String,
         matches: Vec<ObjectHash>,
     },
+    #[error("Invalid hash `{hash_string}`: {problem}")]
+    InvalidHash {
+        hash_string: String,
+        problem: String,
+    }
 }

@@ -10,9 +10,6 @@ pub type Result<T> = anyhow::Result<T>;
 
 #[derive(Debug)]
 pub enum Error {
-    // hash
-    InvalidObjectHash,
-    
     // kvlm
     BadKVLMFormat,
 

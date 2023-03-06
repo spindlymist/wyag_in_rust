@@ -5,7 +5,7 @@ use std::{
 
 use sha1::{Sha1, Digest};
 
-use crate::error::Error;
+use super::ObjectError;
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Hash)]
 pub struct ObjectHash {
@@ -25,9 +25,9 @@ impl ObjectHash {
     }
 
     pub fn to_path(&self) -> PathBuf {
-        let string_hash = self.to_string();
-        let directory = &string_hash[..2];
-        let file = &string_hash[2..];
+        let hash_string = self.to_string();
+        let directory = &hash_string[..2];
+        let file = &hash_string[2..];
 
         [directory, file].iter().collect()
     }
@@ -35,8 +35,8 @@ impl ObjectHash {
 
 impl std::fmt::Display for ObjectHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string_hash = base16ct::lower::encode_string(&self.raw);
-        write!(f, "{string_hash}")
+        let hash_string = base16ct::lower::encode_string(&self.raw);
+        write!(f, "{hash_string}")
     }
 }
 
@@ -49,10 +49,16 @@ impl TryFrom<&str> for ObjectHash {
         match base16ct::mixed::decode(value, &mut raw) {
             Ok(raw) => {
                 if raw.len() != 20 {
-                    return Err(Error::InvalidObjectHash.into());
+                    return Err(ObjectError::InvalidHash {
+                        hash_string: value.to_owned(),
+                        problem: format!("expected 20 bytes, got {}", raw.len())
+                    }.into());
                 }
             },
-            Err(_) => return Err(Error::InvalidObjectHash.into()),
+            Err(_) => return Err(ObjectError::InvalidHash {
+                hash_string: value.to_owned(),
+                problem: "not hexadecimal".to_owned(),
+            }.into()),
         };
 
         Ok(ObjectHash { raw })
