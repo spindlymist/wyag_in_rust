@@ -43,12 +43,6 @@ pub enum Error {
     
     // refs
     InvalidRef,
-    
-    // branches
-    BranchAlreadyExists,
-    BranchIsCheckedOut,
-    BranchPossiblyUnmerged,
-    UnrecognizedHeadRef,
 
     // common
     Io(io::Error),

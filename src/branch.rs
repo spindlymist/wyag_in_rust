@@ -1,7 +1,8 @@
 use std::{fs, collections::VecDeque};
 
+use thiserror::Error;
+
 use crate::{
-    Error,
     Result,
     refs,
     workdir::WorkDir,
@@ -35,14 +36,14 @@ pub fn get_current(wd: &WorkDir) -> Result<Branch> {
     }
     else if let Some(branch_name) = head_contents.strip_prefix("ref: refs/heads/") {
         if branch_name.is_empty() {
-            return Err(Error::InvalidRef.into());
+            return Err(BranchError::UnrecognizedHeadRef(head_contents.to_owned()).into());
         }
 
         Ok(Branch::Named(String::from(branch_name)))
     }
     else {
         // Could be a remote ref which is currently unsupported
-        Err(Error::UnrecognizedHeadRef.into())
+        Err(BranchError::UnrecognizedHeadRef(head_contents.to_owned()).into())
     }
 }
 
@@ -50,7 +51,7 @@ pub fn get_current(wd: &WorkDir) -> Result<Branch> {
 /// identified by `commit_hash`.
 pub fn create(name: &str, wd: &WorkDir, commit_hash: &ObjectHash) -> Result<()> {
     if exists(name, wd)? {
-        return Err(Error::BranchAlreadyExists.into());
+        return Err(BranchError::AlreadyExists(name.to_owned()).into());
     }
 
     refs::create(wd, "heads", name, commit_hash)?;
@@ -64,24 +65,24 @@ pub fn delete(name: &str, wd: &WorkDir) -> Result<()> {
 
     if let Branch::Named(current_name) = current_branch {
         if name == current_name {
-            return Err(Error::BranchIsCheckedOut.into());
+            return Err(BranchError::CheckedOut(name.to_owned()).into());
         }
 
         if !is_merged(name, &current_name, wd)? {
-            return Err(Error::BranchPossiblyUnmerged.into());
+            return Err(BranchError::PossiblyUnmerged(name.to_owned()).into());
         }
 
         refs::delete(wd, "heads", name)
     }
     else {
-        Err(Error::BranchPossiblyUnmerged.into())
+        Err(BranchError::PossiblyUnmerged(name.to_owned()).into())
     }
 }
 
 /// Moves the tip of the branch called `name` to the commit identified by `commit_hash`.
 pub fn update(name: &str, wd: &WorkDir, commit_hash: &ObjectHash) -> Result<()> {
     if !exists(name, wd)? {
-        return Err(Error::InvalidRef.into());
+        return Err(BranchError::Nonexistent(name.to_owned()).into());
     }
 
     refs::create(wd, "heads", name, commit_hash)?;
@@ -108,8 +109,8 @@ pub fn update_current(wd: &WorkDir, commit_hash: &ObjectHash) -> Result<()> {
 pub fn exists(name: &str, wd: &WorkDir) -> Result<bool> {
     match refs::resolve(wd, "heads", name) {
         Ok(_) => Ok(true),
-        Err(err) => match err.downcast_ref::<Error>() {
-            Some(Error::InvalidRef) => Ok(false),
+        Err(err) => match err.downcast_ref::<crate::Error>() {
+            Some(crate::Error::InvalidRef) => Ok(false),
             Some(_) | None => Err(err),
         },
     }
@@ -131,7 +132,7 @@ pub fn is_merged(name: &str, into_branch: &str, wd: &WorkDir) -> Result<bool> {
 
         let commit = match GitObject::read(wd, &hash)? {
             GitObject::Commit(commit) => commit,
-            _ => return Err(Error::NonCommitInGraph.into()),
+            _ => return Err(crate::Error::NonCommitInGraph.into()),
         };
 
         for parent in commit.map.get_all("parent") {
@@ -141,4 +142,18 @@ pub fn is_merged(name: &str, into_branch: &str, wd: &WorkDir) -> Result<bool> {
     }
 
     Ok(false)
+}
+
+#[derive(Error, Debug)]
+pub enum BranchError {
+    #[error("There is no branch called `{0}`")]
+    Nonexistent(String),
+    #[error("Cannot create a branch `{0}` because one already exists")]
+    AlreadyExists(String),
+    #[error("Cannot delete the branch `{0}` because it is currently checked out")]
+    CheckedOut(String),
+    #[error("Cannot delete the branch `{0}` because it may contain unmerged changes")]
+    PossiblyUnmerged(String),
+    #[error("The HEAD ref `{0}` was not recognized (remotes are unsupported)")]
+    UnrecognizedHeadRef(String),
 }
