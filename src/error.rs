@@ -6,19 +6,10 @@ use std::{
     string,
 };
 
-use crate::object::{ObjectHash, ObjectFormat};
-
 pub type Result<T> = anyhow::Result<T>;
 
 #[derive(Debug)]
 pub enum Error {
-    // object
-    InvalidObjectHeader(String),
-    UnrecognizedObjectFormat,
-    BadObjectId,
-    AmbiguousObjectId(Vec<ObjectHash>),
-    UnexpectedObjectFormat(ObjectFormat),
-
     // hash
     InvalidObjectHash,
     

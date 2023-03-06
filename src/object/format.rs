@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::error::Error;
+use super::ObjectError;
 
 #[derive(PartialEq, Eq, Debug)]
 pub enum ObjectFormat {
@@ -26,7 +26,7 @@ impl fmt::Display for ObjectFormat {
 }
 
 impl TryFrom<&str> for ObjectFormat {
-    type Error = Error;
+    type Error = ObjectError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         use ObjectFormat::*;
@@ -36,7 +36,7 @@ impl TryFrom<&str> for ObjectFormat {
             "commit" => Ok(Commit),
             "tag" => Ok(Tag),
             "tree" => Ok(Tree),
-            _ => Err(Error::UnrecognizedObjectFormat),
+            format => Err(ObjectError::UnrecognizedFormat(format.to_owned())),
         }
     }
 }

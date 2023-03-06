@@ -8,27 +8,35 @@ use flate2::{read::ZlibDecoder, write::ZlibEncoder};
 use regex::Regex;
 
 use crate::{
-    Error,
     Result,
     workdir::WorkDir,
     refs,
 };
 
-mod format;
-mod blob;
-mod commit;
-mod hash;
-mod meta;
-mod tag;
-mod tree;
+mod error;
+pub use error::ObjectError;
 
+mod format;
 pub use format::ObjectFormat;
+
+mod blob;
 pub use blob::Blob;
+
+mod commit;
 pub use commit::Commit;
+
+mod hash;
 pub use hash::ObjectHash;
+
+mod meta;
 pub use meta::ObjectMetadata;
+
+mod tag;
 pub use tag::Tag;
+
+mod tree;
 pub use tree::{Tree, TreeEntry};
+
 
 pub enum GitObject {
     Blob(Blob),
@@ -101,12 +109,15 @@ impl GitObject {
     /// 
     /// The identifier may be a (possibly abbreviated) hash, a branch name, a tag, or "HEAD".
     pub fn find(wd: &WorkDir, id: &str) -> Result<ObjectHash> {
-        let candidates = Self::resolve(wd, id)?;
+        let matches = Self::resolve(wd, id)?;
 
-        match candidates.len() {
-            0 => Err(Error::BadObjectId.into()),
-            1 => Ok(candidates[0]),
-            _ => Err(Error::AmbiguousObjectId(candidates).into()),
+        match matches.len() {
+            1 => Ok(matches[0]),
+            0 => Err(ObjectError::InvalidId(id.to_owned()).into()),
+            _ => Err(ObjectError::AmbiguousId {
+                id: id.to_owned(),
+                matches,
+            }.into()),
         }
     }
 
@@ -161,52 +172,62 @@ impl GitObject {
 
     /// Read the object that hashes to `hash` from `repo`.
     pub fn read(wd: &WorkDir, hash: &ObjectHash) -> Result<GitObject> {
-        let mut buf = Vec::new(); // TODO perhaps reserve some capacity here?
-
         // Read and decompress
-        {
+        let mut bytes = {
+            let mut buf = Vec::new(); // TODO perhaps reserve some capacity here?
             let path = PathBuf::from("objects").join(hash.to_path());
             let object_file = wd.open_git_file(path, None)?;
             let mut decoder = ZlibDecoder::new(object_file);
             decoder.read_to_end(&mut buf)?;
-        }
 
-        let mut iter = buf.into_iter();
+            buf.into_iter()
+        };
 
-        // Parse header "<format> <size>\0" where
-        //     <format> is blob, commit, tag, or tree
-        //     <size> is in ASCII base 10
+        // Parse header
         let (format, size) = {
-            let header: Vec<u8> =
-                iter.by_ref()
+            let header_bytes: Vec<u8> =
+                bytes.by_ref()
                 .take_while(|ch| *ch != 0)
                 .collect();
 
-            let header = match str::from_utf8(&header) {
-                Ok(val) => val,
-                Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: couldn't parse header")).into()),
-            };
-
-            let (format, size) = match header.split_once(' ') {
-                Some((left, right)) => (ObjectFormat::try_from(left)?, right),
-                None => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: not enough parts")).into()),
-            };
-
-            let size = match str::parse(size) {
-                Ok(val) => val,
-                Err(_) => return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: invalid length")).into()),
-            };
-
-            (format, size)
+            Self::parse_header(&header_bytes)
+                .map_err(|problem| ObjectError::MalformedHeader {
+                    hash: *hash,
+                    problem
+                })?
         };
 
         // Validate size
-        let data: Vec<u8> = iter.collect();
+        let data: Vec<u8> = bytes.collect();
         if data.len() != size {
-            return Err(Error::InvalidObjectHeader(format!("Malformed object {hash}: incorrect length")).into());
+            return Err(ObjectError::MalformedHeader{
+                hash: *hash,
+                problem: format!("mismatched size (expected {size}, found {})", data.len()),
+            }.into());
         }
 
         Self::deserialize(data, format)
+    }
+
+    /// Parse header "<format> <size>\0" where
+    ///     <format> is blob, commit, tag, or tree
+    ///     <size> is in ASCII base 10
+    fn parse_header(bytes: &[u8]) -> core::result::Result<(ObjectFormat, usize), String> {
+        let header = str::from_utf8(bytes)
+            .map_err(|_| "invalid Utf-8 sequence".to_owned())?;
+
+        if let Some((left, right)) = header.split_once(' ') {
+            let format = ObjectFormat::try_from(left)
+                .map_err(|err| err.to_string())?;
+
+            let size = str::parse(right)
+                .map_err(|_| "failed to parse size".to_owned())?;
+    
+            Ok((format, size))
+        }
+        else {
+            Err("missing separator".to_owned())
+        }
     }
 
     /// Computes the hash for this object.

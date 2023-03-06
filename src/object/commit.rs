@@ -8,7 +8,7 @@ use crate::{
     branch, refs,
 };
 
-use super::{Tree, ObjectHash, GitObject, ObjectMetadata};
+use super::{ObjectError, ObjectFormat, ObjectHash, GitObject, ObjectMetadata, Tree};
 
 pub struct Commit {
     pub map: ListOrderedMultimap<String, String>,
@@ -39,7 +39,10 @@ impl Commit {
     pub fn read(wd: &WorkDir, hash: &ObjectHash) -> Result<Commit> {
         match GitObject::read(wd, hash)? {
             GitObject::Commit(commit) => Ok(commit),
-            object => Err(Error::UnexpectedObjectFormat(object.get_format()).into()),
+            object => Err(ObjectError::UnexpectedFormat {
+                format: object.get_format(),
+                expected: ObjectFormat::Blob
+            }.into()),
         }
     }
     

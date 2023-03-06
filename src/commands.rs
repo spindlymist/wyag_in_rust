@@ -11,6 +11,7 @@ use crate::{
     Result,
     repo::{Repository, RepoError},
     object::{
+        ObjectError,
         GitObject,
         ObjectHash,
         ObjectFormat,
@@ -348,9 +349,9 @@ pub fn cmd_rev_parse(args: RevParseArgs) -> Result<()> {
     let repo = Repository::find(".")?;
     let hashes = match GitObject::find(repo.workdir(), &args.name) {
         Ok(hash) => vec![hash],
-        Err(err) => match err.downcast::<Error>() {
-            Ok(Error::BadObjectId) => vec![],
-            Ok(Error::AmbiguousObjectId(candidates)) => candidates,
+        Err(err) => match err.downcast::<ObjectError>() {
+            Ok(ObjectError::InvalidId(_)) => vec![],
+            Ok(ObjectError::AmbiguousId { matches, .. }) => matches,
             Ok(err) => return Err(err.into()),
             Err(err) => return Err(err),
         },

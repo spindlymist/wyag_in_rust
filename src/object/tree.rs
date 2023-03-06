@@ -3,7 +3,7 @@ use std::{
 };
 
 use crate::{Error, Result, workdir::{WorkDir, WorkPathBuf, WorkPath}, index::Index};
-use super::{ObjectHash, GitObject};
+use super::{ObjectError, ObjectHash, ObjectFormat, GitObject};
 
 pub struct Tree {
     pub entries: BTreeMap<WorkPathBuf, TreeEntry>,
@@ -103,7 +103,10 @@ impl Tree {
     pub fn read(wd: &WorkDir, hash: &ObjectHash) -> Result<Tree> {
         match GitObject::read(wd, hash)? {
             GitObject::Tree(tree) => Ok(tree),
-            object => Err(Error::UnexpectedObjectFormat(object.get_format()).into()),
+            object => Err(ObjectError::UnexpectedFormat {
+                format: object.get_format(),
+                expected: ObjectFormat::Tree,
+            }.into()),
         }
     }
 
