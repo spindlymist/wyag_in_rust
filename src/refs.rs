@@ -4,8 +4,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use thiserror::Error;
+
 use crate::{
-    Error,
     Result,
     workdir::WorkDir,
     object::ObjectHash,
@@ -33,11 +34,11 @@ pub fn resolve_path<P>(wd: &WorkDir, rel_path: P) -> Result<ObjectHash>
 where
     P: AsRef<Path>
 {
-    let abs_path = wd.git_path(rel_path);
+    let abs_path = wd.git_path(&rel_path);
     let ref_contents = match fs::read_to_string(abs_path) {
         Ok(val) => val,
         Err(err) => match err.kind() {
-            io::ErrorKind::NotFound => return Err(Error::InvalidRef.into()),
+            io::ErrorKind::NotFound => return Err(RefError::Invalid(rel_path.as_ref().to_owned()).into()),
             _ => return Err(err.into()),
         },
     };
@@ -102,4 +103,10 @@ pub fn delete(wd: &WorkDir, prefix: &str, name: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+#[derive(Error, Debug)]
+pub enum RefError {
+    #[error("Invalid ref `{0:?}` (possibly an indirect reference)")]
+    Invalid(PathBuf),
 }

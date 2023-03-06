@@ -109,9 +109,9 @@ pub fn update_current(wd: &WorkDir, commit_hash: &ObjectHash) -> Result<()> {
 pub fn exists(name: &str, wd: &WorkDir) -> Result<bool> {
     match refs::resolve(wd, "heads", name) {
         Ok(_) => Ok(true),
-        Err(err) => match err.downcast_ref::<crate::Error>() {
-            Some(crate::Error::InvalidRef) => Ok(false),
-            Some(_) | None => Err(err),
+        Err(err) => match err.downcast_ref::<crate::refs::RefError>() {
+            Some(crate::refs::RefError::Invalid(_)) => Ok(false),
+            None => Err(err),
         },
     }
 }

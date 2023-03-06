@@ -40,9 +40,6 @@ pub enum Error {
     BadIndexFormat(String),
     IndexHasExtensions,
     UncommittedChanges,
-    
-    // refs
-    InvalidRef,
 
     // common
     Io(io::Error),
