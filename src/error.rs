@@ -10,10 +10,6 @@ pub type Result<T> = anyhow::Result<T>;
 
 #[derive(Debug)]
 pub enum Error {
-    // commit
-    NonCommitInGraph,
-    BadCommitFormat,
-
     // tree
     ObjectNotTree,
     BadTreeFormat,

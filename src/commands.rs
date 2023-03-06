@@ -258,20 +258,17 @@ fn log_graphviz(wd: &WorkDir, hash: &ObjectHash, seen: &mut HashSet<ObjectHash>)
     }
     seen.insert(*hash);
 
-    let commit = GitObject::read(wd, hash)?;
+    match GitObject::read(wd, hash)? {
+        GitObject::Commit(commit) => {
+            for parent_hash in commit.parents() {
+                println!("c_{hash} -> c_{parent_hash}");
+                log_graphviz(wd, parent_hash, seen)?;
+            }
+        },
+        object => return Err(branch::BranchError::BrokenCommitGraph(object.get_format()).into()),
+    };
 
-    if let GitObject::Commit(commit) = commit {
-        for parent in commit.map.get_all("parent") {
-            let parent_hash = ObjectHash::try_from(&parent[..])?;
-            println!("c_{hash} -> c_{parent_hash}");
-            log_graphviz(wd, &parent_hash, seen)?;
-        }
-
-        Ok(())
-    }
-    else {
-        Err(Error::NonCommitInGraph.into())
-    }
+    Ok(())
 }
 
 /// List all the files in the staging index.

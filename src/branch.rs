@@ -6,7 +6,7 @@ use crate::{
     Result,
     refs,
     workdir::WorkDir,
-    object::{ObjectHash, GitObject}
+    object::{ObjectHash, GitObject, ObjectFormat}
 };
 
 pub enum Branch {
@@ -132,13 +132,10 @@ pub fn is_merged(name: &str, into_branch: &str, wd: &WorkDir) -> Result<bool> {
 
         let commit = match GitObject::read(wd, &hash)? {
             GitObject::Commit(commit) => commit,
-            _ => return Err(crate::Error::NonCommitInGraph.into()),
+            object => return Err(BranchError::BrokenCommitGraph(object.get_format()).into()),
         };
 
-        for parent in commit.map.get_all("parent") {
-            let parent_hash = ObjectHash::try_from(&parent[..])?;
-            open_hashes.push_back(parent_hash);
-        }
+        open_hashes.extend(commit.parents());
     }
 
     Ok(false)
@@ -156,4 +153,6 @@ pub enum BranchError {
     PossiblyUnmerged(String),
     #[error("The HEAD ref `{0}` was not recognized (remotes are unsupported)")]
     UnrecognizedHeadRef(String),
+    #[error("The commit graph contains a {0}")]
+    BrokenCommitGraph(ObjectFormat),
 }

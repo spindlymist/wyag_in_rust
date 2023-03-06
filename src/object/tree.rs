@@ -112,13 +112,8 @@ impl Tree {
 
     pub fn read_from_commit(wd: &WorkDir, commit_hash: &ObjectHash) -> Result<Tree> {
         let commit = super::Commit::read(wd, commit_hash)?;
-
-        let tree_hash = match commit.map.get("tree") {
-            Some(val) => ObjectHash::try_from(&val[..])?,
-            None => return Err(Error::BadCommitFormat.into()),
-        };
-
-        Self::read(wd, &tree_hash)
+        
+        Self::read(wd, commit.tree())
     }
 
     pub fn deserialize(data: Vec<u8>) -> Result<Tree> {

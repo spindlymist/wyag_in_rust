@@ -11,7 +11,9 @@ use crate::{
 use super::{ObjectError, ObjectFormat, ObjectHash, GitObject, ObjectMetadata, Tree};
 
 pub struct Commit {
-    pub map: ListOrderedMultimap<String, String>,
+    map: ListOrderedMultimap<String, String>,
+    tree: ObjectHash,
+    parents: Vec<ObjectHash>,
 }
 
 impl Commit {
@@ -27,7 +29,9 @@ impl Commit {
         map.insert("".to_owned(), meta.message);
     
         let commit = GitObject::Commit(Commit {
-            map
+            map,
+            tree: tree_hash,
+            parents: vec![parent_hash],
         });
         let commit_hash = commit.write(wd)?;
     
@@ -45,14 +49,35 @@ impl Commit {
             }.into()),
         }
     }
+
+    pub fn tree(&self) -> &ObjectHash {
+        &self.tree
+    }
+
+    pub fn parents(&self) -> &[ObjectHash] {
+        &self.parents
+    }
     
     pub fn deserialize(data: Vec<u8>) -> Result<Commit> {
         let data = std::str::from_utf8(&data)
-            .context("Failed to parse commit")?;
+            .context("Failed to parse commit (invalid Utf-8)")?;
         let map = crate::kvlm::parse(data)?;
+
+        let tree = {
+            let hash_string = map.get("tree").context("Failed to parse commit (missing tree)")?;
+            ObjectHash::try_from(hash_string.as_str())
+                .context("Failed to parse commit (invalid tree hash)")?
+        };
+
+        let parents = map.get_all("parent")
+            .map(|hash_string| ObjectHash::try_from(hash_string.as_str()))
+            .collect::<Result<Vec<_>>>()
+            .context("Failed to parse commit (invalid parent hash)")?;
 
         Ok(Commit {
             map,
+            tree,
+            parents,
         })
     }
 
