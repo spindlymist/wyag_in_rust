@@ -39,6 +39,22 @@ pub enum StagedChange {
 }
 
 impl Index {
+    /// Creates a set of paths from the index entries that match `path`.
+    /// 
+    /// If `path` is present in the index, the set will contain just that path.
+    /// Otherwise, the set will contain all paths that have `path` as an ancestor.
+    /// If no such path exists, the set will be empty.
+    pub fn expected_keys_for_path<'a>(&'a self, path: &'a WorkPathBuf) -> HashSet<&'a WorkPathBuf> {
+        if self.entries.contains_key(path) {
+            [path].into()
+        }
+        else {
+            self.entries_in_dir(path)
+                .map(|(name, _)| name)
+                .collect()
+        }
+    }
+
     /// Compares the index to the file or directory at `path` and enumerates the differences.
     /// If `write` is true, new/modified files will be stored in the repo at `wd`.
     pub fn list_unstaged_changes(&self, wd: &WorkDir, path: &WorkPathBuf, write: bool) -> Result<Vec<UnstagedChange>> {
@@ -46,17 +62,8 @@ impl Index {
         let prev_working_dir = std::env::current_dir()?;
         std::env::set_current_dir(wd.as_path())?;
 
-        // Create a set of paths currently in the index. We will mark them off as we find them
-        // in the file system
-        let mut expected: HashSet<&WorkPathBuf> = if self.entries.contains_key(path) {
-            [path].into()
-        }
-        else {
-            self.entries_in_dir(path)
-                .map(|(name, _)| name)
-                .collect()
-        };
-
+        // Create a "checklist" of matching paths in the index to mark off as they are found in the file system
+        let mut expected = self.expected_keys_for_path(path);
         let mut changes = vec![];
 
         // Compare to the file system
@@ -176,17 +183,8 @@ impl Index {
     {
         let root_tree = Tree::read_from_commit(wd, commit_hash)?;
 
-        // Create a set of paths currently in the index. We will mark them off as we find them
-        // in the commit tree
-        let mut expected: HashSet<&WorkPathBuf> = if self.entries.contains_key(path) {
-            [path].into()
-        }
-        else {
-            self.entries_in_dir(path)
-                .map(|(name, _)| name)
-                .collect()
-        };
-        
+        // Create a "checklist" of matching paths in the index to mark off as they are found in the commit tree
+        let mut expected = self.expected_keys_for_path(path);
         let mut changes = vec![];
 
         // If no path was provided, start at the root. Otherwise, find the tree that contains
