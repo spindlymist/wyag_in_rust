@@ -49,7 +49,7 @@ impl Tree {
         let mut entries = BTreeMap::new();
         let mut subtrees_handled: HashSet<&WorkPath> = HashSet::new();
         
-        let index_entries = index.range_from_prefix(prefix);
+        let index_entries = index.entries_in_dir(prefix);
         for (path, index_entry) in index_entries {
             let (name, subpath) =
                 path.strip_prefix(prefix)

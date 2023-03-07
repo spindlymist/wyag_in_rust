@@ -52,7 +52,7 @@ impl Index {
             [path].into()
         }
         else {
-            self.range_from_prefix(path)
+            self.entries_in_dir(path)
                 .map(|(name, _)| name)
                 .collect()
         };
@@ -182,7 +182,7 @@ impl Index {
             [path].into()
         }
         else {
-            self.range_from_prefix(path)
+            self.entries_in_dir(path)
                 .map(|(name, _)| name)
                 .collect()
         };

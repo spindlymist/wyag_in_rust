@@ -198,13 +198,13 @@ impl Index {
         }
     }
 
-    pub fn range_from_prefix(&self, prefix: &WorkPath) -> IndexRange {
-        if prefix.is_empty() {
+    pub fn entries_in_dir(&self, dir: &WorkPath) -> IndexRange {
+        if dir.is_empty() {
             return self.entries.range::<WorkPathBuf, std::ops::RangeFull>(..);
         }
 
-        let range_start = std::ops::Bound::Excluded(format!("{prefix}/"));
-        let range_end = std::ops::Bound::Excluded(format!("{prefix}0"));
+        let range_start = std::ops::Bound::Excluded(format!("{dir}/"));
+        let range_end = std::ops::Bound::Excluded(format!("{dir}0"));
 
         self.entries.range((range_start, range_end))
     }
@@ -375,7 +375,7 @@ impl Index {
                 }
                 else {
                     let keys_to_remove: Vec<_> =
-                        self.range_from_prefix(&path)
+                        self.entries_in_dir(&path)
                         .map(|(key, _)| key)
                         .cloned()
                         .collect();
@@ -406,4 +406,109 @@ impl Index {
         Ok(())
     }
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    fn fake_entry() -> IndexEntry {
+        IndexEntry {
+            stats: FileStats {
+                ctime_s: 0,
+                ctime_ns: 0,
+                mtime_s: 0,
+                mtime_ns: 0,
+                dev: 0,
+                ino: 0,
+                mode: 0,
+                uid: 0,
+                gid: 0,
+                size: 0,
+            },
+            hash: ObjectHash::new([]),
+            flags: EntryFlags::new("hello_world.rs"),
+        }
+    }
+
+    fn insert_fake_entry(index: &mut Index, path: &str) {
+        index.entries.insert(path.try_into().unwrap(), fake_entry());
+    }
+
+    #[test]
+    fn pad_no_null() {
+        let padding = Index::calc_padding_len(8 * 64 - 3, false);
+        assert_eq!(padding, 3);
+    }
+
+    #[test]
+    fn pad_with_null() {
+        let padding = Index::calc_padding_len(8 * 64 - 3, true);
+        assert_eq!(padding, 3);
+    }
+
+    #[test]
+    fn pad_multiple_of_8_no_null() {
+        let padding = Index::calc_padding_len(8 * 64, false);
+        assert_eq!(padding, 8);
+    }
+
+    #[test]
+    fn pad_multiple_of_8_with_null() {
+        let padding = Index::calc_padding_len(8 * 64, true);
+        assert_eq!(padding, 0);
+    }
+
+    #[test]
+    fn entries_in_extant_dir() {
+        let mut index = Index {
+            version: 0,
+            entries: BTreeMap::new(),
+            ext_data: vec![]
+        };
+        insert_fake_entry(&mut index, "main.rs");
+        insert_fake_entry(&mut index, "goodbye/world.rs");
+        insert_fake_entry(&mut index, "hello/world/ ");
+        insert_fake_entry(&mut index, "hello/world/foo.rs");
+        insert_fake_entry(&mut index, "hello/world/bar/foo.rs");
+        insert_fake_entry(&mut index, "hello/world/bar/baz.rs");
+        insert_fake_entry(&mut index, "hello/world/~~~~~");
+        insert_fake_entry(&mut index, "hello/world0");
+        insert_fake_entry(&mut index, "hello/friend.rs");
+
+        let dir = WorkPathBuf::try_from("hello/world").unwrap();
+        let entries: HashSet<_> = index.entries_in_dir(&dir)
+            .map(|(key, _)| key)
+            .cloned()
+            .collect();
+    
+        let expected: HashSet<WorkPathBuf> = [
+            "hello/world/ ".try_into().unwrap(),
+            "hello/world/foo.rs".try_into().unwrap(),
+            "hello/world/bar/foo.rs".try_into().unwrap(),
+            "hello/world/bar/baz.rs".try_into().unwrap(),
+            "hello/world/~~~~~".try_into().unwrap(),
+        ].into();
+
+        assert_eq!(entries, expected);
+    }
+
+    #[test]
+    fn entries_in_nonexistent_dir() {
+        let mut index = Index {
+            version: 0,
+            entries: BTreeMap::new(),
+            ext_data: vec![]
+        };
+        insert_fake_entry(&mut index, "main.rs");
+        insert_fake_entry(&mut index, "goodbye/world.rs");
+        insert_fake_entry(&mut index, "hello/world");
+        insert_fake_entry(&mut index, "hello/friend.rs");
+
+        let dir = WorkPathBuf::try_from("hello/world").unwrap();
+        let mut entries = index.entries_in_dir(&dir);
+
+        assert!(entries.next().is_none());
+    }
 }
