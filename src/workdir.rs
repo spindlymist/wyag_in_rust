@@ -74,14 +74,6 @@ impl WorkDir {
         path
     }
 
-    /// Appends a relative path to the repo's working directory.
-    pub fn working_path<P>(&self, rel_path: P) -> PathBuf
-    where
-        P: AsRef<Path>
-    {
-        self.0.join(rel_path)
-    }
-
     /// Opens a file in the repo's .git directory.
     pub fn open_git_file<P>(&self, rel_path: P, options: Option<&OpenOptions>) -> Result<File>
     where
@@ -142,5 +134,51 @@ impl TryFrom<&str> for WorkDir {
 
     fn try_from(value: &str) -> Result<Self> {
         WorkDir::new(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn canonicalize_rel_path() {
+        let wd = WorkDir::new("my_work_dir").unwrap();
+        let path = wd.canonicalize_path("my_work_dir/src/main.rs").unwrap();
+        assert_eq!(path.as_str(), "src/main.rs");
+    }
+
+    #[test]
+    fn canonicalize_abs_path() {
+        let wd = WorkDir::new(r"C:\my_work_dir").unwrap();
+        let path = wd.canonicalize_path(r"C:\my_work_dir\src\main.rs").unwrap();
+        assert_eq!(path.as_str(), "src/main.rs");
+    }
+
+    #[test]
+    fn canonicalize_rejects_rel_path_outside_workdir() {
+        let wd = WorkDir::new(r"my_work_dir").unwrap();
+        let path = wd.canonicalize_path("src/main.rs");
+        assert!(path.is_err());
+    }
+
+    #[test]
+    fn canonicalize_rejects_abs_path_outside_workdir() {
+        let wd = WorkDir::new(r"C:\my_work_dir").unwrap();
+        let path = wd.canonicalize_path(r"C:\my_other_dir\src\main.rs");
+        assert!(path.is_err());
+    }
+
+    #[test]
+    fn git_path() {
+        let wd = WorkDir::new(r"C:\my_work_dir").unwrap();
+        let path = wd.git_path(r"refs/heads/main");
+        let components: Vec<_> = path.components().collect();
+        let expected_components: Vec<_> = {
+            let expected_path: &Path = "C:/my_work_dir/.git/refs/heads/main".as_ref();
+            expected_path.components().collect()
+        };
+
+        assert_eq!(components, expected_components);
     }
 }
