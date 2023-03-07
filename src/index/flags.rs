@@ -13,24 +13,24 @@
 ///     13-bit unused, must be zero
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub struct EntryFlags {
-    pub (super) basic_flags: u16,
-    pub (super) ext_flags: Option<u16>,
+    pub(super) basic_flags: u16,
+    pub(super) ext_flags: Option<u16>,
 }
 
-pub (super) const MASK_ASSUME_VALID: u16      = 0b1000_0000_0000_0000;
-pub (super) const MASK_EXTENDED: u16          = 0b0100_0000_0000_0000;
-pub (super) const MASK_STAGE: u16             = 0b0011_0000_0000_0000;
-pub (super) const MASK_NAME_LEN: u16          = 0b0000_1111_1111_1111;
-// pub (super) const MASK_EXT_RESERVED: u16   = 0b1000_0000_0000_0000;
-pub (super) const MASK_EXT_SKIP_WORKTREE: u16 = 0b0100_0000_0000_0000;
-pub (super) const MASK_EXT_INTENT_TO_ADD: u16 = 0b0010_0000_0000_0000;
-// pub (super) const MASK_EXT_UNUSED: u16     = 0b0001_1111_1111_1111;
+pub(super) const MASK_ASSUME_VALID: u16      = 0b1000_0000_0000_0000;
+pub(super) const MASK_EXTENDED: u16          = 0b0100_0000_0000_0000;
+pub(super) const MASK_STAGE: u16             = 0b0011_0000_0000_0000;
+pub(super) const MASK_NAME_LEN: u16          = 0b0000_1111_1111_1111;
+// pub(super) const MASK_EXT_RESERVED: u16   = 0b1000_0000_0000_0000;
+pub(super) const MASK_EXT_SKIP_WORKTREE: u16 = 0b0100_0000_0000_0000;
+pub(super) const MASK_EXT_INTENT_TO_ADD: u16 = 0b0010_0000_0000_0000;
+// pub(super) const MASK_EXT_UNUSED: u16     = 0b0001_1111_1111_1111;
 
 impl EntryFlags {
     pub fn new(name: &str) -> EntryFlags {
         let mut flags = EntryFlags { basic_flags: 0, ext_flags: None };
 
-        let name_len = std::cmp::max(name.len(), 0xFFF);
+        let name_len = std::cmp::min(name.len(), 0xFFF);
         flags.set_name_len(name_len.try_into().unwrap());
 
         flags
@@ -111,5 +111,22 @@ impl EntryFlags {
 
     pub fn clear_intent_to_add(&mut self) {
         *self.ext_flags.as_mut().unwrap() &= !MASK_EXT_INTENT_TO_ADD;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn name_len_is_correct_under_0xfff() {
+        let flags = EntryFlags::new("hello_world.rs");
+        assert_eq!(flags.get_name_len(), 14);
+    }
+
+    #[test]
+    fn name_len_is_limited_to_0xfff() {
+        let flags = EntryFlags::new(&str::repeat("a", 0x1000));
+        assert_eq!(flags.get_name_len(), 0xFFF);
     }
 }
