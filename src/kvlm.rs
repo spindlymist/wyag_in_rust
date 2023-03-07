@@ -148,3 +148,131 @@ pub enum KvlmError {
     #[error("The kvlm has an invalid entry (no space after key)")]
     InvalidEntry
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_single_values() {
+        let map = parse("\
+key1 this is value 1
+key2 value 2
+ has exactly
+ three lines
+key3 this is value 3
+
+this is the message
+with two lines").unwrap();
+        {
+            let keys: Vec<_> = map.keys().collect();
+            assert_eq!(keys, vec!["key1", "key2", "key3", ""]);
+        }
+        {
+            let key1_values: Vec<_> = map.get_all("key1").collect();
+            assert_eq!(key1_values, vec!["this is value 1"]);
+        }
+        {
+            let key2_values: Vec<_> = map.get_all("key2").collect();
+            assert_eq!(key2_values, vec!["value 2\nhas exactly\nthree lines"]);
+        }
+        {
+            let key3_values: Vec<_> = map.get_all("key3").collect();
+            assert_eq!(key3_values, vec!["this is value 3"]);
+        }
+        {
+            let msg_values: Vec<_> = map.get_all("").collect();
+            assert_eq!(msg_values, vec!["this is the message\nwith two lines"]);
+        }
+    }
+
+    #[test]
+    fn parse_multi_values() {
+        let map = parse("\
+key1 this is value 1.1
+ which has two lines
+key2 this is value 2.1
+key2 this is value 2.2
+ which also has two lines
+key1 this is value 1.2
+
+this is the message").unwrap();
+        {
+            let keys: Vec<_> = map.keys().collect();
+            assert_eq!(keys, vec!["key1", "key2", ""]);
+        }
+        {
+            let key1_values: Vec<_> = map.get_all("key1").collect();
+            assert_eq!(key1_values, vec!["this is value 1.1\nwhich has two lines", "this is value 1.2"]);
+        }
+        {
+            let key2_values: Vec<_> = map.get_all("key2").collect();
+            assert_eq!(key2_values, vec!["this is value 2.1", "this is value 2.2\nwhich also has two lines"]);
+        }
+        {
+            let msg_values: Vec<_> = map.get_all("").collect();
+            assert_eq!(msg_values, vec!["this is the message"]);
+        }
+    }
+
+    #[test]
+    fn parse_rejects_missing_key() {
+        let map = parse("\
+key1 is okay
+key2hasnospace
+
+this is the message");
+        assert!(map.is_err());
+    }
+
+    #[test]
+    fn parse_rejects_missing_message() {
+        let map = parse("\
+key1 is okay
+key2 is too");
+        assert!(map.is_err());
+    }
+
+    #[test]
+    fn serialize_single_values() {
+        let mut map = ListOrderedMultimap::new();
+        map.insert("key1".to_owned(), "this is value 1".to_owned());
+        map.insert("key2".to_owned(), "value 2\nhas exactly\nthree lines".to_owned());
+        map.insert("key3".to_owned(), "this is value 3".to_owned());
+        map.insert("".to_owned(), "this is the message\nwith two lines".to_owned());
+
+        let serialized = serialize(&map);
+
+        assert_eq!(serialized, "\
+key1 this is value 1
+key2 value 2
+ has exactly
+ three lines
+key3 this is value 3
+
+this is the message
+with two lines");
+    }
+
+    #[test]
+    fn serialize_multi_values() {
+        let mut map = ListOrderedMultimap::new();
+        map.insert("key1".to_owned(), "this is value 1.1\nwhich has two lines".to_owned());
+        map.append("key1".to_owned(), "this is value 1.2".to_owned());
+        map.insert("key2".to_owned(), "this is value 2.1".to_owned());
+        map.append("key2".to_owned(), "this is value 2.2\nwhich also has two lines".to_owned());
+        map.insert("".to_owned(), "this is the message".to_owned());
+
+        let serialized = serialize(&map);
+
+        assert_eq!(serialized, "\
+key1 this is value 1.1
+ which has two lines
+key1 this is value 1.2
+key2 this is value 2.1
+key2 this is value 2.2
+ which also has two lines
+
+this is the message");
+    }
+}
