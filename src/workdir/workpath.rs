@@ -3,11 +3,11 @@ use std::{ops::Deref, borrow::Borrow, path::{Path, PathBuf}, fmt, ffi::OsString}
 use super::WorkDirError;
 
 #[repr(transparent)]
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct WorkPath(str);
 
 #[repr(transparent)]
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
 pub struct WorkPathBuf(String);
 
 impl WorkPath {
@@ -40,6 +40,9 @@ impl WorkPath {
         if let Some(suffix) = self.0.strip_suffix(&suffix.0) {
             if suffix.is_empty() {
                 unsafe { Some(Self::from_str(suffix)) }
+            }
+            else if suffix.len() == self.0.len() {
+                Some(self)
             }
             else {
                 unsafe { Some(Self::from_str(&suffix[..suffix.len() - 1])) }
@@ -123,7 +126,9 @@ impl fmt::Display for WorkPath {
 
 impl WorkPathBuf {
     pub fn push(&mut self, path: &WorkPath) {
-        self.0.push('/');
+        if !self.0.is_empty() {
+            self.0.push('/');
+        }
         self.0.push_str(&path.0);
     }
 
@@ -278,5 +283,230 @@ impl TryFrom<&[u8]> for WorkPathBuf {
 impl fmt::Display for WorkPathBuf {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slashes_are_normalized() {
+        {
+            let path = WorkPathBuf::try_from(r"this/is\my/mixed\slash\path").unwrap();
+            assert_eq!(path.as_str(), "this/is/my/mixed/slash/path");
+        }
+        {
+            let path = WorkPathBuf::try_from(r"this/\path//has\\repeated\/slashes").unwrap();
+            assert_eq!(path.as_str(), "this/path/has/repeated/slashes");
+        }
+        {
+            let path = WorkPathBuf::try_from(r"trailing/slash/").unwrap();
+            assert_eq!(path.as_str(), "trailing/slash");
+        }
+    }
+
+    #[test]
+    fn absolute_paths_are_rejected() {
+        {
+            let result = WorkPathBuf::try_from("/this/is/my/absolute/path");
+            assert!(result.is_err());
+        }
+        {
+            let result = WorkPathBuf::try_from(r"C:\this\my\absolute\path\on\windows");
+            assert!(result.is_err());
+        }
+        {
+            let result = WorkPathBuf::try_from(r"\\this\is\my\windows\network\path");
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn forbidden_components_are_rejected() {
+        {
+            let result = WorkPathBuf::try_from(".");
+            assert!(result.is_err());
+        }
+        {
+            let result = WorkPathBuf::try_from(r"my/../path");
+            assert!(result.is_err());
+        }
+        {
+            let result = WorkPathBuf::try_from(r"path/to/.git/directory");
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn push_to_empty_path() {
+        let mut path = WorkPathBuf::try_from("").unwrap();
+        let subpath = WorkPathBuf::try_from("hello").unwrap();
+        path.push(&subpath);
+        assert_eq!(path.as_str(), "hello");
+    }
+
+    #[test]
+    fn push_to_nonempty_path() {
+        let mut path = WorkPathBuf::try_from("hello").unwrap();
+        let subpath = WorkPathBuf::try_from("world/good/morning").unwrap();
+        path.push(&subpath);
+        assert_eq!(path.as_str(), "hello/world/good/morning");
+    }
+
+    #[test]
+    fn pop_from_empty_path() {
+        let mut path = WorkPathBuf::try_from("").unwrap();
+        let was_popped = path.pop();
+        assert!(!was_popped);
+        assert_eq!(path.as_str(), "");
+    }
+
+    #[test]
+    fn pop_from_single_component_path() {
+        let mut path = WorkPathBuf::try_from("hello").unwrap();
+        let was_popped = path.pop();
+        assert!(was_popped);
+        assert_eq!(path.as_str(), "");
+    }
+
+    #[test]
+    fn pop_from_multi_component_path() {
+        let mut path = WorkPathBuf::try_from("hello/world").unwrap();
+        let was_popped = path.pop();
+        assert!(was_popped);
+        assert_eq!(path.as_str(), "hello");
+    }
+
+    #[test]
+    fn strip_prefix_not_present() {
+        let path: &WorkPath = &WorkPathBuf::try_from("hello/world").unwrap();
+        let prefix: &WorkPath = &WorkPathBuf::try_from("ahoy").unwrap();
+        let suffix = path.strip_prefix(prefix);
+        assert!(suffix.is_none());
+    }
+
+    #[test]
+    fn strip_prefix_present() {
+        let path: &WorkPath = &WorkPathBuf::try_from("hello/there/world").unwrap();
+        {
+            let prefix: &WorkPath = &WorkPathBuf::try_from("").unwrap();
+            let suffix = path.strip_prefix(prefix).unwrap();
+            assert_eq!(suffix, "hello/there/world");
+        }
+        {
+            let prefix: &WorkPath = &WorkPathBuf::try_from("hello").unwrap();
+            let suffix = path.strip_prefix(prefix).unwrap();
+            assert_eq!(suffix, "there/world");
+        }
+        {
+            let prefix: &WorkPath = &WorkPathBuf::try_from("hello/there").unwrap();
+            let suffix = path.strip_prefix(prefix).unwrap();
+            assert_eq!(suffix, "world");
+        }
+        {
+            let prefix: &WorkPath = &WorkPathBuf::try_from("hello/there/world").unwrap();
+            let suffix = path.strip_prefix(prefix).unwrap();
+            assert_eq!(suffix, "");
+        }
+    }
+
+    #[test]
+    fn strip_suffix_not_present() {
+        let path: &WorkPath = &WorkPathBuf::try_from("hello/world").unwrap();
+        let suffix: &WorkPath = &WorkPathBuf::try_from("earth").unwrap();
+        let prefix = path.strip_suffix(suffix);
+        assert!(prefix.is_none());
+    }
+
+    #[test]
+    fn strip_suffix_present() {
+        let path: &WorkPath = &WorkPathBuf::try_from("hello/there/world").unwrap();
+        {
+            let suffix: &WorkPath = &WorkPathBuf::try_from("").unwrap();
+            let prefix = path.strip_suffix(suffix).unwrap();
+            assert_eq!(prefix, "hello/there/world");
+        }
+        {
+            let suffix: &WorkPath = &WorkPathBuf::try_from("world").unwrap();
+            let prefix = path.strip_suffix(suffix).unwrap();
+            assert_eq!(prefix, "hello/there");
+        }
+        {
+            let suffix: &WorkPath = &WorkPathBuf::try_from("there/world").unwrap();
+            let prefix = path.strip_suffix(suffix).unwrap();
+            assert_eq!(prefix, "hello");
+        }
+        {
+            let suffix: &WorkPath = &WorkPathBuf::try_from("hello/there/world").unwrap();
+            let prefix = path.strip_suffix(suffix).unwrap();
+            assert_eq!(prefix, "");
+        }
+    }
+
+    #[test]
+    fn parent_of_empty_path() {
+        let path: &WorkPath = &WorkPathBuf::try_from("").unwrap();
+        let parent = path.parent();
+        assert!(parent.is_none());
+    }
+
+    #[test]
+    fn parent_of_single_component_path() {
+        let path: &WorkPath = &WorkPathBuf::try_from("hello").unwrap();
+        let parent = path.parent().unwrap();
+        assert_eq!(parent, "");
+    }
+
+    #[test]
+    fn parent_of_multi_component_path() {
+        let path: &WorkPath = &WorkPathBuf::try_from("hello/there/world").unwrap();
+        let parent = path.parent().unwrap();
+        assert_eq!(parent, "hello/there");
+    }
+
+    #[test]
+    fn file_name_of_empty_path() {
+        let path: &WorkPath = &WorkPathBuf::try_from("").unwrap();
+        let file_name = path.file_name();
+        assert_eq!(file_name, "");
+    }
+
+    #[test]
+    fn file_name_of_single_component_path() {
+        let path: &WorkPath = &WorkPathBuf::try_from("hello").unwrap();
+        let file_name = path.file_name();
+        assert_eq!(file_name, "hello");
+    }
+
+    #[test]
+    fn file_name_of_multi_component_path() {
+        let path: &WorkPath = &WorkPathBuf::try_from("hello/there/world").unwrap();
+        let file_name = path.file_name();
+        assert_eq!(file_name, "world");
+    }
+
+    #[test]
+    fn partition_empty_path() {
+        let path: &WorkPath = &WorkPathBuf::try_from("").unwrap();
+        let (first, rest) = path.partition();
+        assert_eq!(first, "");
+        assert!(rest.is_none());
+    }
+
+    #[test]
+    fn partition_single_component_path() {
+        let path: &WorkPath = &WorkPathBuf::try_from("hello").unwrap();
+        let (first, rest) = path.partition();
+        assert_eq!(first, "hello");
+        assert!(rest.is_none());
+    }
+
+    #[test]
+    fn partition_multi_component_path() {
+        let path: &WorkPath = &WorkPathBuf::try_from("hello/there/world").unwrap();
+        let (first, rest) = path.partition();
+        assert_eq!(first, "hello");
+        assert_eq!(rest.unwrap(), "there/world");
     }
 }
