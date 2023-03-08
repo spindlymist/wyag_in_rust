@@ -53,7 +53,7 @@ pub enum Commands {
 }
 
 #[derive(clap::ValueEnum, Clone)]
-enum ClapObjectFormat {
+pub enum ClapObjectFormat {
     Commit,
     Tree,
     Tag,
@@ -77,7 +77,7 @@ impl From<ClapObjectFormat> for ObjectFormat {
 #[derive(Args)]
 pub struct AddArgs {
     /// The file or directory to stage
-    path: PathBuf,
+    pub path: PathBuf,
 }
 
 pub fn cmd_add(args: AddArgs) -> Result<()> {
@@ -98,10 +98,10 @@ pub fn cmd_add(args: AddArgs) -> Result<()> {
 #[derive(Args)]
 pub struct BranchArgs {
     #[arg(short, long)]
-    delete: bool,
-    branch_name: Option<String>,
+    pub delete: bool,
+    pub branch_name: Option<String>,
     #[arg(default_value = "HEAD")]
-    start_point: String,
+    pub start_point: String,
 }
 
 pub fn cmd_branch(args: BranchArgs) -> Result<()> {
@@ -129,10 +129,10 @@ pub fn cmd_branch(args: BranchArgs) -> Result<()> {
 pub struct CatFileArgs {
     /// The type of object to display
     #[arg(id = "TYPE")]
-    object_type: ClapObjectFormat,
+    pub object_type: ClapObjectFormat,
 
     /// The object to display
-    object: String,
+    pub object: String,
 }
 
 pub fn cmd_cat_file(args: CatFileArgs) -> Result<()> {
@@ -149,9 +149,9 @@ pub fn cmd_cat_file(args: CatFileArgs) -> Result<()> {
 #[derive(Args)]
 pub struct CheckoutArgs {
     /// The commit or tree to checkout.
-    commit: String,
+    pub commit: String,
     /// The EMPTY directory to checkout on.
-    path: PathBuf,
+    pub path: PathBuf,
 }
 
 pub fn cmd_checkout(args: CheckoutArgs) -> Result<()> {
@@ -172,7 +172,7 @@ pub fn cmd_checkout(args: CheckoutArgs) -> Result<()> {
 pub struct CommitArgs {
     /// A message to attach to the tag.
     #[arg(short, default_value = "")]
-    message: String,
+    pub message: String,
 }
 
 pub fn cmd_commit(args: CommitArgs) -> Result<()> {
@@ -191,14 +191,14 @@ pub fn cmd_commit(args: CommitArgs) -> Result<()> {
 pub struct HashObjectArgs {
     /// Actually write the object into the database
     #[arg(short, long)]
-    write: bool,
+    pub write: bool,
 
     /// The type of the object
     #[arg(id = "type", short, long, default_value = "blob")]
-    format: ClapObjectFormat,
+    pub format: ClapObjectFormat,
 
     /// Path to read the object from
-    path: PathBuf,
+    pub path: PathBuf,
 }
 
 pub fn cmd_hash_object(args: HashObjectArgs) -> Result<()> {
@@ -220,7 +220,7 @@ pub fn cmd_hash_object(args: HashObjectArgs) -> Result<()> {
 #[derive(Args)]
 pub struct InitArgs {
     /// Where to create the repository.
-    path: Option<PathBuf>,
+    pub path: Option<PathBuf>,
 }
 
 pub fn cmd_init(args: InitArgs) -> Result<()> {
@@ -237,7 +237,7 @@ pub fn cmd_init(args: InitArgs) -> Result<()> {
 pub struct LogArgs {
     /// The commit to start at.
     #[arg(default_value = "HEAD")]
-    commit: String,
+    pub commit: String,
 }
 
 pub fn cmd_log(args: LogArgs) -> Result<()> {
@@ -295,7 +295,7 @@ pub fn cmd_ls_files(_args: LsFilesArgs) -> Result<()> {
 #[derive(Args)]
 pub struct LsTreeArgs {
     /// The tree object to display.
-    object: String,
+    pub object: String,
 }
 
 pub fn cmd_ls_tree(args: LsTreeArgs) -> Result<()> {
@@ -335,7 +335,7 @@ pub fn cmd_rebase(_args: RebaseArgs) -> Result<()> {
 #[derive(Args)]
 pub struct RevParseArgs {
     /// The name to parse.
-    name: String,
+    pub name: String,
 }
 
 pub fn cmd_rev_parse(args: RevParseArgs) -> Result<()> {
@@ -368,7 +368,7 @@ pub fn cmd_rev_parse(args: RevParseArgs) -> Result<()> {
 #[derive(Args)]
 pub struct RmArgs {
     /// The file or directory to remove. Must match index and branch tip.
-    path: PathBuf,
+    pub path: PathBuf,
 }
 
 pub fn cmd_rm(args: RmArgs) -> Result<()> {
@@ -390,7 +390,7 @@ pub fn cmd_rm(args: RmArgs) -> Result<()> {
 pub struct StatusArgs {
     /// The file or directory to compare
     #[arg(default_value = ".")]
-    path: PathBuf,
+    pub path: PathBuf,
 }
 
 pub fn cmd_status(args: StatusArgs) -> Result<()> {
@@ -460,22 +460,22 @@ pub fn cmd_show_ref(_args: ShowRefArgs) -> Result<()> {
 pub struct TagArgs {
     /// Create an annotated tag.
     #[arg(short, long)]
-    annotate: bool,
+    pub annotate: bool,
 
     /// Delete the tag.
     #[arg(short, long)]
-    delete: bool,
+    pub delete: bool,
 
     /// The new tag's name.
-    name: Option<String>,
+    pub name: Option<String>,
 
     /// The object the new tag will point to.
     #[arg(default_value = "HEAD")]
-    object: String,
+    pub object: String,
 
     /// A message to attach to the tag.
     #[arg(short, default_value = "")]
-    message: String,
+    pub message: String,
 }
 
 pub fn cmd_tag(args: TagArgs) -> Result<()> {

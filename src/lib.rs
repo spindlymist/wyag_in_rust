@@ -1,18 +1,19 @@
-mod commands;
-use commands::*;
-pub use commands::Cli;
-
 pub type Result<T> = anyhow::Result<T>;
 
-pub mod repo;
+pub mod commands;
+pub use commands::Cli;
+
+pub mod branch;
+pub mod index;
+pub mod kvlm;
 pub mod object;
 pub mod refs;
-pub mod kvlm;
-pub mod index;
-pub mod branch;
+pub mod repo;
 pub mod workdir;
 
 pub fn run(cli: Cli) {
+    use commands::*;
+
     let result = match cli.command {
         Commands::Add(args) => cmd_add(args),
         Commands::Branch(args) => cmd_branch(args),
