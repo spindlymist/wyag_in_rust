@@ -127,7 +127,8 @@ impl Tree {
                 let mode_bytes: Vec<u8> = iter.by_ref()
                     .take_while(|ch| *ch != b' ')
                     .collect();
-                String::from_utf8(mode_bytes)?
+                String::from_utf8(mode_bytes)
+                    .context("Failed to parse tree (invalid Utf-8)")?
             };
 
             if mode.is_empty() {
@@ -139,7 +140,8 @@ impl Tree {
                     .take_while(|ch| *ch != 0)
                     .collect();
 
-                WorkPathBuf::try_from(&path[..])?
+                WorkPathBuf::try_from(&path[..])
+                    .context("Failed to parse tree (invalid path)")?
             };
 
             let hash = {
