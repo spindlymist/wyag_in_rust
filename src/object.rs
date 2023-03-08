@@ -136,13 +136,13 @@ impl GitObject {
                 }
             }
             else {
-                let object_dir_name = &id[..2];
-                let dir = wd.git_path(PathBuf::from("objects").join(object_dir_name));
-                if dir.exists() {
-                    let hashes: Vec<ObjectHash> = std::fs::read_dir(dir)?
+                let dir_name = &id[..2];
+                let dir_path = wd.git_path(format!("objects/{dir_name}"));
+                if dir_path.exists() {
+                    let hashes: Vec<ObjectHash> = std::fs::read_dir(dir_path)?
                         .collect::<core::result::Result<Vec<std::fs::DirEntry>, _>>()?
                         .into_iter()
-                        .map(|file| format!("{object_dir_name}{}", file.file_name().to_string_lossy()))
+                        .map(|file| format!("{dir_name}{}", file.file_name().to_string_lossy()))
                         .filter(|hash_string| hash_string.starts_with(id))
                         .filter_map(|hash_string| ObjectHash::try_from(&hash_string[..]).ok())
                         .collect();
