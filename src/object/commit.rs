@@ -89,3 +89,89 @@ impl Commit {
         self.serialize()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extracts_tree_hash() {
+        let tree_hash = "bf42a97e57f4f7e090ee62e5967e94fc4331dabb";
+        let commit_text: Vec<u8> = format!("\
+tree {tree_hash}
+author spindlymist <ocrobin@gmail.com> 1673643222 -0800
+committer spindlymist <ocrobin@gmail.com> 1673643222 -0800
+
+add dependencies and cli skeleton").into();
+
+        let commit = Commit::deserialize(commit_text).unwrap();
+        let expected_hash = ObjectHash::try_from(tree_hash).unwrap();
+        assert_eq!(commit.tree(), &expected_hash);
+    }
+
+    #[test]
+    fn rejects_missing_tree() {
+        let commit_text = "\
+author spindlymist <ocrobin@gmail.com> 1673643222 -0800
+committer spindlymist <ocrobin@gmail.com> 1673643222 -0800
+
+add dependencies and cli skeleton".as_bytes().to_owned();
+
+        let result = Commit::deserialize(commit_text);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn rejects_invalid_tree_hash() {
+        let commit_text = "\
+tree invalid_hash
+author spindlymist <ocrobin@gmail.com> 1673643222 -0800
+committer spindlymist <ocrobin@gmail.com> 1673643222 -0800
+
+add dependencies and cli skeleton".as_bytes().to_owned();
+
+        let result = Commit::deserialize(commit_text);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn extracts_parent_hashes() {
+        use std::collections::HashSet;
+        
+        let parent1_hash = "0d96eca9c7072cae8f8425e1ffa1ad9c55b75bfe";
+        let parent2_hash = "025bfe6f28e0cb39fc982ba8b631bed61cc8a8af";
+        let commit_text: Vec<u8> = format!("\
+tree 44b9ee4ad7dcff749880b916fc6ee3258cc5e764
+parent {parent1_hash}
+parent {parent2_hash}
+author spindlymist <ocrobin@gmail.com> 1678233745 -0800
+committer spindlymist <ocrobin@gmail.com> 1678233745 -0800
+
+add tests for object::hash").into();
+
+        let commit = Commit::deserialize(commit_text).unwrap();
+
+        // Convert to set - order doesn't matter
+        let parent_hashes: HashSet<ObjectHash> = commit.parents().iter().cloned().collect();
+        let expected_hashes: HashSet<ObjectHash> = [
+            ObjectHash::try_from(parent1_hash).unwrap(),
+            ObjectHash::try_from(parent2_hash).unwrap()
+        ].into();
+
+        assert_eq!(parent_hashes, expected_hashes);
+    }
+
+    #[test]
+    fn rejects_invalid_parent_hash() {
+        let commit_text: Vec<u8> = format!("\
+tree 44b9ee4ad7dcff749880b916fc6ee3258cc5e764
+parent invalid_hash
+author spindlymist <ocrobin@gmail.com> 1678233745 -0800
+committer spindlymist <ocrobin@gmail.com> 1678233745 -0800
+
+add tests for object::hash").into();
+
+        let result = Commit::deserialize(commit_text);
+        assert!(result.is_err());
+    }
+}
