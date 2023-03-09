@@ -19,7 +19,7 @@ use crate::{
         ObjectMetadata, Tree,
     },
     refs,
-    index::{Index, UnstagedChange, StagedChange},
+    index::{UnstagedChange, StagedChange},
     branch,
     workdir::WorkDir,
 };
@@ -82,7 +82,7 @@ pub struct AddArgs {
 
 pub fn cmd_add(args: AddArgs) -> Result<()> {
     let repo = Repository::find(".")?;
-    let mut index = Index::from_repo(repo.workdir())?;
+    let mut index = repo.index()?;
 
     if !index.ext_data.is_empty() {
         eprintln!("Warning: index contains unsupported extensions.");
@@ -177,7 +177,7 @@ pub struct CommitArgs {
 
 pub fn cmd_commit(args: CommitArgs) -> Result<()> {
     let repo = Repository::find(".")?;
-    let index = Index::from_repo(repo.workdir())?;
+    let index = repo.index()?;
     let meta = ObjectMetadata::new(&repo, args.message)?;
 
     let hash = Commit::create(&index, repo.workdir(), meta)?;
@@ -278,7 +278,7 @@ pub struct LsFilesArgs {
 
 pub fn cmd_ls_files(_args: LsFilesArgs) -> Result<()> {
     let repo = Repository::find(".")?;
-    let index = Index::from_repo(repo.workdir())?;
+    let index = repo.index()?;
 
     if !index.ext_data.is_empty() {
         eprintln!("Warning: index contains unsupported extensions.");
@@ -373,7 +373,7 @@ pub struct RmArgs {
 
 pub fn cmd_rm(args: RmArgs) -> Result<()> {
     let repo = Repository::find(".")?;
-    let mut index = Index::from_repo(repo.workdir())?;
+    let mut index = repo.index()?;
 
     if !index.ext_data.is_empty() {
         eprintln!("Warning: index contains unsupported extensions.");
@@ -398,13 +398,13 @@ pub fn cmd_status(args: StatusArgs) -> Result<()> {
         let repo = Repository::find(".")?;
         let wd = repo.workdir();
         let path = wd.canonicalize_path(args.path)?;
-        let index = Index::from_repo(wd)?;
+        let index = repo.index()?;
         let commit_hash = branch::get_current(wd)?.tip(wd)?;
+
+        let staged_changes = index.list_staged_changes(wd, commit_hash.as_ref(), &path)?;
+        let unstaged_changes = index.list_unstaged_changes(wd, &path, false)?;
         
-        (
-            index.list_staged_changes(wd, &commit_hash, &path)?,
-            index.list_unstaged_changes(wd, &path, false)?
-        )
+        (staged_changes, unstaged_changes)
     };
 
     if !staged_changes.is_empty() {

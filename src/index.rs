@@ -55,12 +55,13 @@ impl Index {
     /// 4-byte signature that begins a valid index file.
     const INDEX_SIGNATURE: [u8; 4] = [b'D', b'I', b'R', b'C'];
 
-    /// Parses the index file in `repo`.
-    pub fn from_repo(wd: &WorkDir) -> Result<Index> {
-        let file = wd.open_git_file("index", None)?;
-        let mut buf_reader = std::io::BufReader::new(file);
-
-        Self::parse(&mut buf_reader)
+    /// Constructs an empty `Index` with the specified version.
+    pub fn new(version: Option<u32>) -> Index {
+        Index {
+            version: version.unwrap_or(2),
+            entries: BTreeMap::new(),
+            ext_data: Vec::new(),
+        }
     }
 
     /// Constructs an `Index` from a byte stream.
@@ -339,7 +340,7 @@ impl Index {
 
         {
             let commit_hash = branch::get_current(wd)?.tip(wd)?;
-            let staged_changes = self.list_staged_changes(wd, &commit_hash, &path)?;
+            let staged_changes = self.list_staged_changes(wd, commit_hash.as_ref(), &path)?;
             if !staged_changes.is_empty() {
                 return Err(IndexError::UncommittedChanges.into());
             }

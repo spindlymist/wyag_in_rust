@@ -15,10 +15,16 @@ pub enum Branch {
 }
 
 impl Branch {
-    pub fn tip(&self, wd: &WorkDir) -> Result<ObjectHash> {
+    pub fn tip(&self, wd: &WorkDir) -> Result<Option<ObjectHash>> {
         match self {
-            Branch::Named(name) => refs::resolve(wd, "heads", name),
-            Branch::Headless(hash) => Ok(*hash)
+            Branch::Named(name) => match refs::resolve(wd, "heads", name) {
+                Ok(hash) => Ok(Some(hash)),
+                Err(err) => match err.downcast_ref::<RefError>() {
+                    Some(RefError::Nonexistent(_)) => Ok(None),
+                    Some(_) | None => Err(err),
+                }
+            },
+            Branch::Headless(hash) => Ok(Some(*hash))
         }
     }
 }

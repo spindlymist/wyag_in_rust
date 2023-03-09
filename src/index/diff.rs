@@ -179,23 +179,26 @@ impl Index {
     }
 
     /// Compares the index to the commit tree identified by `commit_hash` and enumerates the differences.
-    pub fn list_staged_changes(&self, wd: &WorkDir, commit_hash: &ObjectHash, path: &WorkPathBuf) -> Result<Vec<StagedChange>>
-    {
-        let root_tree = Tree::read_from_commit(wd, commit_hash)?;
-
+    /// 
+    /// If `commit_hash` is `None`, all entries in the index will be considered created.
+    pub fn list_staged_changes(&self, wd: &WorkDir, commit_hash: Option<&ObjectHash>, path: &WorkPathBuf) -> Result<Vec<StagedChange>> {
         // Create a "checklist" of matching paths in the index to mark off as they are found in the commit tree
         let mut expected = self.expected_keys_for_path(path);
         let mut changes = vec![];
 
-        // If no path was provided, start at the root. Otherwise, find the tree that contains
-        // the entry associated with that path
-        if path.is_empty() {
-            for (name, entry) in root_tree.entries {
-                self.staged_compare_path(wd, (name, &entry), &mut changes, &mut expected)?;
+        if let Some(commit_hash) = commit_hash {
+            let root_tree = Tree::read_from_commit(wd, commit_hash)?;
+
+            // If no path was provided, start at the root. Otherwise, find the tree that contains
+            // the entry associated with that path
+            if path.is_empty() {
+                for (name, entry) in root_tree.entries {
+                    self.staged_compare_path(wd, (name, &entry), &mut changes, &mut expected)?;
+                }
             }
-        }
-        else if let Some(entry) = root_tree.find_entry(wd, path)? {
-            self.staged_compare_path(wd, (path.clone(), &entry), &mut changes, &mut expected)?;
+            else if let Some(entry) = root_tree.find_entry(wd, path)? {
+                self.staged_compare_path(wd, (path.clone(), &entry), &mut changes, &mut expected)?;
+            }
         }
 
         // Any files that we didn't see while enumerating the commit tree must be new

@@ -3,6 +3,7 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
 };
+use anyhow::Context;
 use ini::Ini;
 use path_absolutize::Absolutize;
 use thiserror::Error;
@@ -10,6 +11,8 @@ use thiserror::Error;
 use crate::{
     Result,
     workdir::WorkDir,
+    index::Index,
+    branch,
 };
 
 pub struct Repository {
@@ -116,6 +119,32 @@ impl Repository {
         }
     }
 
+    /// Parses (or creates) the repo's index.
+    pub fn index(&self) -> Result<Index> {
+        let index_path = self.workdir.git_path("index");
+
+        if index_path.is_file() {
+            let file = std::fs::File::open(&index_path)
+                .with_context(|| format!("Failed to open index file at `{index_path:?}`"))?;
+            let mut reader = std::io::BufReader::new(file);
+    
+            Index::parse(&mut reader)
+        }
+        else if branch::get_current(&self.workdir)?
+            .tip(&self.workdir)?
+            .is_some()
+        {
+            // Index file was deleted or something
+            // This shouldn't happen during normal usage
+            Err(RepoError::IndexMissing.into())
+        }
+        else {
+            // Repo was just created and there are no commits yet
+            // Create an empty index
+            Ok(Index::new(None))
+        }
+    }
+
     pub fn get_config(&self, section: &str, key: &str) -> Option<&str> {
         // TODO support global config
         self.config.get_from(Some(section), key)
@@ -141,4 +170,6 @@ pub enum RepoError {
     FmtVersionMissing,
     #[error("Repo format version `{0}` is not supported")]
     FmtVersionUnsupported(String),
+    #[error("The index file is missing")]
+    IndexMissing,
 }
