@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::{
     Result,
-    refs,
+    refs::{self, RefError},
     workdir::WorkDir,
     object::{ObjectHash, GitObject, ObjectFormat}
 };
@@ -109,9 +109,9 @@ pub fn update_current(wd: &WorkDir, commit_hash: &ObjectHash) -> Result<()> {
 pub fn exists(name: &str, wd: &WorkDir) -> Result<bool> {
     match refs::resolve(wd, "heads", name) {
         Ok(_) => Ok(true),
-        Err(err) => match err.downcast_ref::<crate::refs::RefError>() {
-            Some(crate::refs::RefError::Invalid(_)) => Ok(false),
-            None => Err(err),
+        Err(err) => match err.downcast_ref::<RefError>() {
+            Some(RefError::Nonexistent(_)) => Ok(false),
+            Some(_) | None => Err(err),
         },
     }
 }

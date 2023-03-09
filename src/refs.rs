@@ -1,9 +1,6 @@
-use std::{
-    fs,
-    io,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::{Path, PathBuf}};
 
+use anyhow::Context;
 use thiserror::Error;
 
 use crate::{
@@ -34,22 +31,43 @@ pub fn resolve_path<P>(wd: &WorkDir, rel_path: P) -> Result<ObjectHash>
 where
     P: AsRef<Path>
 {
-    let abs_path = wd.git_path(&rel_path);
-    let ref_contents = match fs::read_to_string(abs_path) {
-        Ok(val) => val,
-        Err(err) => match err.kind() {
-            io::ErrorKind::NotFound => return Err(RefError::Invalid(rel_path.as_ref().to_owned()).into()),
-            _ => return Err(err.into()),
-        },
-    };
+    let rel_path = rel_path.as_ref();
+    let abs_path = wd.git_path(rel_path);
+
+    if !abs_path.is_file() {
+        return Err(RefError::Nonexistent(rel_path.to_owned()).into());
+    }
+
+    let ref_contents = fs::read_to_string(&abs_path)
+        .with_context(|| format!("Failed to read ref at `{abs_path:?}`"))?;
     let ref_contents = ref_contents.trim();
 
-    // This ref may refer to another ref
+    // A valid ref is either a hash or the name of another ref
     if let Some(indirect_path) = ref_contents.strip_prefix("ref: ") {
+        if indirect_path.is_empty() {
+            return Err(RefError::Corrupt {
+                ref_path: rel_path.to_owned(),
+                ref_contents: ref_contents.to_owned(),
+            }.into());
+        }
+
         resolve_path(wd, indirect_path)
+            .map_err(|err| match err.downcast::<RefError>() {
+                Ok(next_err) => RefError::BadChain {
+                    ref_path: rel_path.to_owned(),
+                    next: Box::new(next_err),
+                }.into(),
+                Err(err) => err,
+            })
+    }
+    else if let Ok(hash) = ObjectHash::try_from(ref_contents) {
+        Ok(hash)
     }
     else {
-        ObjectHash::try_from(ref_contents)
+        Err(RefError::Corrupt {
+            ref_path: rel_path.to_owned(),
+            ref_contents: ref_contents.to_owned(),
+        }.into())
     }
 }
 
@@ -107,6 +125,16 @@ pub fn delete(wd: &WorkDir, prefix: &str, name: &str) -> Result<()> {
 
 #[derive(Error, Debug)]
 pub enum RefError {
-    #[error("Invalid ref `{0:?}` (possibly an indirect reference)")]
-    Invalid(PathBuf),
+    #[error("No ref found at `{0:?}`")]
+    Nonexistent(PathBuf),
+    #[error("The ref `{ref_path:?}` is corrupt (contents: `{ref_contents}`)")]
+    Corrupt {
+        ref_path: PathBuf,
+        ref_contents: String,
+    },
+    #[error("The ref `{ref_path:?}` points to a bad ref (possibly indirectly)")]
+    BadChain {
+        ref_path: PathBuf,
+        next: Box<RefError>,
+    }
 }
