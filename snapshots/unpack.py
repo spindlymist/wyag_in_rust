@@ -1,6 +1,7 @@
+import argparse
 import os
 import shutil
-import argparse
+import subprocess
 
 # Parse arguments
 parser = argparse.ArgumentParser()
@@ -12,15 +13,19 @@ snapshots_dir = os.path.dirname(__file__)
 assert(os.path.basename(snapshots_dir) == "snapshots")
 os.chdir(snapshots_dir)
 
-# Pack each directory into a zip with the same name
+# Unpack each 7z archive into a directory with the same name
 for entry_name in os.listdir("."):
     if not os.path.isfile(entry_name): continue
 
     dir_name, ext = os.path.splitext(entry_name)
-    if ext.lower() != ".zip": continue
+    if ext.lower() != ".7z": continue
 
     if os.path.isdir(dir_name):
         if not force: continue
         shutil.rmtree(dir_name)
+        
+    os.mkdir(dir_name)
 
-    shutil.unpack_archive(entry_name, dir_name, 'zip')
+    # 7-zip must be on PATH
+    command = f"7z x {entry_name} -o{dir_name}"
+    subprocess.run(command, shell=True)

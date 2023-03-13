@@ -1,6 +1,6 @@
-import os
-import shutil
 import argparse
+import os
+import subprocess
 
 # Parse arguments
 parser = argparse.ArgumentParser()
@@ -16,9 +16,11 @@ os.chdir(snapshots_dir)
 for entry_name in os.listdir("."):
     if not os.path.isdir(entry_name): continue
 
-    zip_name = f"{entry_name}.zip"
-    if os.path.isfile(zip_name):
+    archive_name = f"{entry_name}.7z"
+    if os.path.isfile(archive_name):
         if not force: continue
-        os.remove(zip_name)
+        os.remove(archive_name)
 
-    shutil.make_archive(entry_name, 'zip', entry_name)
+    # 7-zip must be on PATH
+    command = f"7z a {entry_name} ./{entry_name}/* -mtc -mtm -mta"
+    subprocess.run(command, shell=True)

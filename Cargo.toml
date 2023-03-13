@@ -24,6 +24,6 @@ thiserror = "1.0.39"
 
 [dev-dependencies]
 assert_fs = "1.0.10"
-dir-assert = "0.2.0"
+dir-diff = "0.3.2"
 predicates = "2.1.5"
-zip = "0.6.4"
+sevenz-rust = "0.2.8"

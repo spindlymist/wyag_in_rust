@@ -8,7 +8,7 @@ use wyag::{
 
 #[test]
 fn init_fails_on_nonempty_directory() {
-    let (temp_dir, snapshot) = setup_snapshot("uninitialized", false).unwrap();
+    let test_dir = setup("uninitialized", false).unwrap();
 
     let err = cmd_init(InitArgs {
             path: None,
@@ -19,12 +19,12 @@ fn init_fails_on_nonempty_directory() {
     assert!(matches!(err, RepoError::InitPathExists(_)));
 
     // The init directory should be unchanged
-    assert_paths!(temp_dir, snapshot);
+    assert_matches_snapshot(test_dir, "uninitialized");
 }
 
 #[test]
 fn init_fails_on_nonempty_subdirectory() {
-    let (temp_dir, snapshot) = setup_snapshot("uninitialized", true).unwrap();
+    let test_dir = setup("uninitialized", true).unwrap();
 
     let err = cmd_init(InitArgs {
             path: Some("uninitialized".into()),
@@ -35,23 +35,27 @@ fn init_fails_on_nonempty_subdirectory() {
     assert!(matches!(err, RepoError::InitPathExists(_)));
 
     // The init directory should be unchanged
-    assert_paths!(temp_dir.child("uninitialized"), snapshot);
+    assert_matches_snapshot(test_dir.child("uninitialized"), "uninitialized");
 }
 
 #[test]
 fn init_succeeds_on_empty_directory() {
-    let (temp_dir, _) = setup_snapshot("empty", false).unwrap();
+    let test_dir = setup_empty().unwrap();
 
-    cmd_init(InitArgs { path: None }).unwrap();
+    cmd_init(InitArgs {
+        path: None
+    }).unwrap();
 
-    assert_paths!(temp_dir, Snapshot::named("initialized").unwrap());
+    assert_matches_snapshot(&test_dir, "initialized");
 }
 
 #[test]
 fn init_succeeds_on_empty_subdirectory() {
-    let (temp_dir, _) = setup_snapshot("empty", true).unwrap();
+    let test_dir = setup_empty().unwrap();
 
-    cmd_init(InitArgs { path: Some("empty".into()) }).unwrap();
+    cmd_init(InitArgs {
+        path: Some("empty".into())
+    }).unwrap();
 
-    assert_paths!(temp_dir.child("empty"), Snapshot::named("initialized").unwrap());
+    assert_matches_snapshot(test_dir.child("empty"), "initialized");
 }
