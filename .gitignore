@@ -1,2 +1,5 @@
 /target
 /snapshots/*/
+/scripts/__scratch/
+__pycache__/
+*.log
