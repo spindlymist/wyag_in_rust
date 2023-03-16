@@ -64,7 +64,7 @@ impl Tree {
 
                 let (subtree_hash, _) = Self::make_subtree(index, wd, subtree_prefix)?;
                 let tree_entry = TreeEntry {
-                    mode: "040000".to_owned(),
+                    mode: "40000".to_owned(), // git drops the leading 0 when storing a tree
                     hash: subtree_hash,
                 };
                 entries.insert(name.to_owned(), tree_entry);

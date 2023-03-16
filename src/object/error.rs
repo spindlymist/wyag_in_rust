@@ -31,5 +31,7 @@ pub enum ObjectError {
     #[error("Invalid hash bytes: {bytes:?}")]
     InvalidHashBytes {
         bytes: Vec<u8>,
-    }
+    },
+    #[error("A commit cannot be created from an empty index.")]
+    EmptyIndex,
 }

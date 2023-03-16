@@ -5,7 +5,7 @@ use crate::{
     Result,
     workdir::WorkDir,
     index::Index,
-    branch, refs,
+    branch,
 };
 
 use super::{ObjectError, ObjectFormat, ObjectHash, GitObject, ObjectMetadata, Tree};
@@ -18,12 +18,21 @@ pub struct Commit {
 
 impl Commit {
     pub fn create(index: &Index, wd: &WorkDir, meta: ObjectMetadata) -> Result<ObjectHash> {
+        if index.entries.is_empty() {
+            return Err(ObjectError::EmptyIndex.into());
+        }
+
         let (tree_hash, _) = Tree::create_from_index(index, wd)?;
-        let parent_hash = refs::head(wd)?;
+
+        let parent_hash = branch::get_current(wd)?.tip(wd)?;
+        let mut parents = Vec::new();
     
         let mut map = ListOrderedMultimap::new();
         map.insert("tree".to_owned(), tree_hash.to_string());
-        map.insert("parent".to_owned(), parent_hash.to_string());
+        if let Some(parent_hash) = parent_hash {
+            map.insert("parent".to_owned(), parent_hash.to_string());
+            parents.push(parent_hash);
+        }
         map.insert("author".to_owned(), meta.author_line());
         map.insert("committer".to_owned(), meta.author_line());
         map.insert("".to_owned(), meta.message);
@@ -31,7 +40,7 @@ impl Commit {
         let commit = GitObject::Commit(Commit {
             map,
             tree: tree_hash,
-            parents: vec![parent_hash],
+            parents,
         });
         let commit_hash = commit.write(wd)?;
     

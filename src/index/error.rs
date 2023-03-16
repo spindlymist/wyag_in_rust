@@ -10,4 +10,6 @@ pub enum IndexError {
     UnsupportedVersion(u32),
     #[error("There are uncommited changes in the index or working directory")]
     UncommittedChanges,
+    #[error("An empty index cannot be saved.")]
+    EmptyIndex,
 }

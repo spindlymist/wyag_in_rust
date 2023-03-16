@@ -4,6 +4,7 @@ use std::{
     str,
 };
 
+use anyhow::Context;
 use flate2::{read::ZlibDecoder, write::ZlibEncoder};
 use regex::Regex;
 
@@ -11,6 +12,7 @@ use crate::{
     Result,
     workdir::WorkDir,
     refs,
+    branch,
 };
 
 mod error;
@@ -152,7 +154,15 @@ impl GitObject {
         }
 
         if id == "HEAD" {
-            candidates.push(refs::head(wd)?);
+            let head = branch::get_current(wd)?.tip(wd)?;
+
+            if let Some(head_hash) = head {
+                candidates.push(head_hash);
+            }
+            else {
+                return Err(ObjectError::InvalidId(id.to_owned()))
+                    .context("HEAD ref could not be resolved. Have you committed to the current branch?");
+            }
         }
 
         if let Ok(local_branch) = refs::resolve(wd, "heads", id) {

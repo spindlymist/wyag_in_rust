@@ -71,11 +71,6 @@ where
     }
 }
 
-/// Determines the hash pointed to by the HEAD ref of `repo`.
-pub fn head(wd: &WorkDir) -> Result<ObjectHash> {
-    resolve_path(wd, "HEAD")
-}
-
 /// Enumerates all of the refs defined in `repo`.
 pub fn list(wd: &WorkDir) -> Result<Vec<(String, ObjectHash)>> {
     let prev_working_dir = std::env::current_dir()?;

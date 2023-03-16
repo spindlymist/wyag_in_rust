@@ -87,10 +87,6 @@ pub fn delete(name: &str, wd: &WorkDir) -> Result<()> {
 
 /// Moves the tip of the branch called `name` to the commit identified by `commit_hash`.
 pub fn update(name: &str, wd: &WorkDir, commit_hash: &ObjectHash) -> Result<()> {
-    if !exists(name, wd)? {
-        return Err(BranchError::Nonexistent(name.to_owned()).into());
-    }
-
     refs::create(wd, "heads", name, commit_hash)?;
 
     Ok(())
