@@ -300,7 +300,6 @@ impl Index {
         for change in changes.into_iter() {
             match change {
                 UnstagedChange::Created { path, stats, hash } => {
-                    println!("created:   {path}");
                     let flags = EntryFlags::new(path.as_str());
                     self.entries.insert(path, IndexEntry {
                         stats,
@@ -309,11 +308,9 @@ impl Index {
                     });
                 },
                 UnstagedChange::Deleted { path } => {
-                    println!("deleted:   {path}");
                     self.entries.remove(&path);
                 },
                 UnstagedChange::Modified { path, stats, hash } => {
-                    println!("modified:  {path}");
                     let entry = self.entries.get_mut(&path).expect("Path should already exist in index");
                     entry.stats = stats;
                     entry.hash = hash;
