@@ -7,7 +7,6 @@ use std::{
 
 use anyhow::Context;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use path_absolutize::Absolutize;
 
 use crate::{
     Result,
@@ -325,12 +324,17 @@ impl Index {
         Ok(())
     }
 
-    pub fn remove<P>(&mut self, wd: &WorkDir, path: P) -> Result<()>
+    /// Removes the file or directory at `path` from the index and deletes it from the file system.
+    /// 
+    /// The index and working directory are required to match the tip of the current branch.
+    /// Subdirectories are removed recursively.
+    pub fn remove<'a, P>(&'a mut self, wd: &WorkDir, path: P) -> Result<()>
     where
         P: AsRef<Path>
     {
         let path = wd.canonicalize_path(path)?;
 
+        // Abort if there are staged or unstaged changes
         {
             let unstaged_changes = self.list_unstaged_changes(wd, &path, false)?;
             if !unstaged_changes.is_empty() {
@@ -346,47 +350,26 @@ impl Index {
             }
         }
 
-        if let Some(abs_path) = path.as_ref().absolutize()?.to_str() {
-            if path.as_ref().is_dir() {
-                println!("Type the full path of the directory to delete it *and all of its children*:");
-            }
-            else if path.as_ref().is_file() {
-                println!("Type the full path of the file to delete it:");
-            }
-            else {
-                println!("The path does not exist");
-                return Ok(());
-            }
+        // Delete files and remove them from the index
+        if path.as_ref().is_dir() {
+            std::fs::remove_dir_all(&path)?;
+        }
+        else {
+            std::fs::remove_file(&path)?;
+        }
 
-            println!("{abs_path}");
+        if self.entries.contains_key(&path) {
+            self.entries.remove(&path);
+        }
+        else {
+            let keys_to_remove: Vec<_> =
+                self.entries_in_dir(&path)
+                .map(|(key, _)| key)
+                .cloned()
+                .collect();
 
-            let mut confirm = String::new();
-            std::io::stdin().read_line(&mut confirm)?;
-
-            if confirm.trim_end() == abs_path {
-                if path.as_ref().is_dir() {
-                    std::fs::remove_dir_all(&path)?;
-                }
-                else {
-                    std::fs::remove_file(&path)?;
-                }
-
-                if self.entries.contains_key(&path) {
-                    self.entries.remove(&path);
-                }
-                else {
-                    let keys_to_remove: Vec<_> =
-                        self.entries_in_dir(&path)
-                        .map(|(key, _)| key)
-                        .cloned()
-                        .collect();
-
-                    for key in keys_to_remove {
-                        self.entries.remove(&key);
-                    }
-                }
-
-
+            for key in keys_to_remove {
+                self.entries.remove(&key);
             }
         }
 
