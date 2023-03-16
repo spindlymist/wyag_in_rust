@@ -34,6 +34,7 @@ pub fn setup(name: &str, make_subdir: bool) -> Result<TempDir> {
 }
 
 /// Creates an empty temporary directory and `cd`s into it.
+#[allow(dead_code)] // not actually dead, but `cargo test` thinks it is
 pub fn setup_empty() -> Result<TempDir> {
     let temp_dir = TempDir::new()
         .with_context(|| format!("Error setting up test environment: failed to create temporary directory"))?;
