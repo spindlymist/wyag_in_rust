@@ -178,7 +178,7 @@ def generate_snapshot(name, force):
     print("{:-^80s}".format(" end directory diff "))
 
     if input("accept differences (y/n)? ").lower() != 'y':
-        logging.log(f"differences were rejected for snapshot `{name}`")
+        logging.info(f"differences were rejected for snapshot `{name}`")
         return
 
     print("{:-^80s}".format(" begin ls-files diff "))
@@ -186,7 +186,7 @@ def generate_snapshot(name, force):
     print("{:-^80s}".format(" end ls-files diff "))
 
     if input("accept differences (y/n)? ").lower() != 'y':
-        logging.log(f"differences were rejected for snapshot `{name}`")
+        logging.info(f"differences were rejected for snapshot `{name}`")
         return
     
     # save snapshot and clean up
@@ -196,4 +196,4 @@ def generate_snapshot(name, force):
     os.remove(git_ls_files_output)
     shutil.rmtree(git_after_dir, onerror=delete_readonly)
 
-    logging.log(f"done generating snapshot `{name}`")
+    logging.info(f"done generating snapshot `{name}`")
