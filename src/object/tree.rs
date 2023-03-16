@@ -180,6 +180,6 @@ impl Tree {
 
 impl TreeEntry {
     pub fn is_dir(&self) -> bool {
-        self.mode == "040000"
+        self.mode == "40000"
     }
 }
