@@ -251,19 +251,16 @@ impl GitObject {
     pub fn write(&self, wd: &WorkDir) -> Result<ObjectHash> {
         let (hash, data) = self.prepare_for_storage();
 
-        let object_file = {
+        // Skip writing if the file for this hash already exists
+        // The contents will be unchanged unless the compression level is changed
+        // or in the extremely unlikely event of a hash collision
+        let path = PathBuf::from("objects").join(hash.to_path());
+        if !wd.git_path(&path).exists() {
+            // Compress and write to disk
             let mut options = std::fs::OpenOptions::new();
-            options
-                .create(true)
-                .write(true)
-                .truncate(true);
-            let path = PathBuf::from("objects").join(hash.to_path());
-
-            wd.open_git_file(path, Some(&options))?
-        };
-
-        // Compress and write to disk
-        {
+            options.create(true).write(true);
+            let object_file = wd.open_git_file(path, Some(&options))?;
+    
             const COMPRESSION_LEVEL: u32 = 6;
             let mut encoder = ZlibEncoder::new(object_file, flate2::Compression::new(COMPRESSION_LEVEL));
             encoder.write_all(&data)?;
