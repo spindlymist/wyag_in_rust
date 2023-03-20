@@ -2,7 +2,7 @@ use std::{
     collections::{HashSet, BTreeMap}
 };
 
-use anyhow::Context;
+use anyhow::{Context, bail};
 
 use crate::{Result, workdir::{WorkDir, WorkPathBuf, WorkPath}, index::Index};
 use super::{ObjectError, ObjectHash, ObjectFormat, GitObject};
@@ -18,8 +18,51 @@ pub struct TreeEntry {
 }
 
 impl Tree {
-    pub fn restore(&self, _wd: &WorkDir, _target: &WorkPath) -> Result<()> {
-        todo!("not implemented")
+    /// Updates the working directory at path `target` to match this tree.
+    /// The existing file or directory at `target` (if any) will be deleted.
+    pub fn restore(&self, wd: &WorkDir, target: &WorkPath) -> Result<()> {
+        let abs_path = wd.as_path().join(target);
+
+        // Remove existing file(s)
+        if abs_path.is_file() {
+            std::fs::remove_file(&abs_path)?;
+        }
+        else if abs_path.is_dir() {
+            // Delete everything except the .git directory (if present)
+            // Note that any .git directories in subdirectories will be deleted
+            for entry in abs_path.read_dir()? {
+                let entry = entry?;
+                let entry_path = entry.path();
+                
+                if entry_path.is_file() {
+                    std::fs::remove_file(&entry_path)?;
+                }
+                else if entry_path.is_dir() && entry.file_name() != ".git" {
+                    std::fs::remove_dir_all(&entry_path)?;
+                }
+            }
+        }
+        else {
+            std::fs::create_dir(&abs_path)?;
+        }
+
+        // Copy files from the repo to the working directory
+        for (name, entry) in &self.entries {
+            let object_path = target.to_owned().join(name);
+        
+            match GitObject::read(wd, &entry.hash)? {
+                GitObject::Blob(blob) => {
+                    let object_abs_path = wd.as_path().join(object_path);
+                    std::fs::write(object_abs_path, blob.serialize_into())?;
+                },
+                GitObject::Tree(tree) => {
+                    tree.restore(wd, &object_path)?;
+                },
+                object => bail!("Failed to parse tree (expected tree or blob, got {})", object.get_format()),
+            };
+        }
+
+        Ok(())
     }
 
     pub fn create_from_index(index: &Index, wd: &WorkDir) -> Result<(ObjectHash, GitObject)> {

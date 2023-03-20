@@ -125,6 +125,10 @@ impl fmt::Display for WorkPath {
 }
 
 impl WorkPathBuf {
+    pub fn root() -> Self {
+        Self("".to_owned())
+    }
+
     pub fn push(&mut self, path: &WorkPath) {
         if !self.0.is_empty() {
             self.0.push('/');

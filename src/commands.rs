@@ -2,6 +2,7 @@ use std::{
     path::PathBuf,
     collections::HashSet,
 };
+use anyhow::bail;
 use clap::{Parser, Subcommand, Args};
 
 use crate::{
@@ -17,9 +18,9 @@ use crate::{
         ObjectMetadata, Tree,
     },
     refs,
-    index::{UnstagedChange, StagedChange},
+    index::{UnstagedChange, StagedChange, Index},
     branch,
-    workdir::WorkDir,
+    workdir::{WorkDir, WorkPathBuf},
 };
 
 #[derive(Parser)]
@@ -458,8 +459,55 @@ pub struct SwitchArgs {
     pub branch_or_commit: String,
 }
 
-pub fn cmd_switch(_args: SwitchArgs) -> Result<()> {
-    todo!("not implemented")
+pub fn cmd_switch(args: SwitchArgs) -> Result<()> {
+    let repo = Repository::find(".")?;
+    let wd = repo.workdir();
+    let path = WorkPathBuf::root();
+    
+    // Ensure clean working directory
+    {
+        let index = repo.index()?;
+        let commit_hash = branch::get_current(wd)?.tip(wd)?;
+        
+        let staged_changes = index.list_staged_changes(wd, commit_hash.as_ref(), &path)?;
+        if !staged_changes.is_empty() {
+            bail!("Cannot switch branches: index has staged changes.");
+        }
+
+        let unstaged_changes = index.list_unstaged_changes(wd, &path, false)?;
+        if !unstaged_changes.is_empty() {
+            bail!("Cannot switch branches: working directory has unstaged changes.");
+        }
+    }
+
+    // Update HEAD
+    if args.detach {
+        let commit_hash = GitObject::find(wd, &args.branch_or_commit)?;
+        let branch = branch::Branch::Headless(commit_hash);
+        branch::switch(wd, &branch)?;
+    }
+    else {
+        let branch = branch::Branch::Named(args.branch_or_commit);
+        branch::switch(wd, &branch)?;
+    }
+
+    // Update working directory
+    if let Some(hash) = branch::get_current(wd)?.tip(wd)? {
+        let tree = Tree::read_from_commit(wd, &hash)?;
+        tree.restore(wd, &path)?;
+    }
+    else {
+        bail!("Cannot switch branches: branch has no tip");
+    }
+
+    // Update index
+    {
+        let mut index = Index::new(None);
+        index.add(wd, &path)?;
+        index.write(wd)?;
+    }
+
+    Ok(())
 }
 
 /// List, create, or delete tags.
