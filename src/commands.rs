@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::{
     path::PathBuf,
     collections::HashSet,
@@ -8,7 +6,7 @@ use clap::{Parser, Subcommand, Args};
 
 use crate::{
     Result,
-    repo::{Repository, RepoError},
+    repo::Repository,
     object::{
         ObjectError,
         GitObject,
@@ -44,11 +42,12 @@ pub enum Commands {
    LsFiles(LsFilesArgs),
    LsTree(LsTreeArgs),
    Merge(MergeArgs),
-   Rebase(RebaseArgs),
+   Restore(RestoreArgs),
    RevParse(RevParseArgs),
    Rm(RmArgs),
    ShowRef(ShowRefArgs),
    Status(StatusArgs),
+   Switch(SwitchArgs),
    Tag(TagArgs),
 }
 
@@ -145,26 +144,16 @@ pub fn cmd_cat_file(args: CatFileArgs) -> Result<()> {
     Ok(())
 }
 
-/// Checkout a commit inside of a directory.
+/// Not supported: use switch or restore.
 #[derive(Args)]
-pub struct CheckoutArgs {
-    /// The commit or tree to checkout.
-    pub commit: String,
-    /// The EMPTY directory to checkout on.
-    pub path: PathBuf,
-}
+pub struct CheckoutArgs { }
 
-pub fn cmd_checkout(args: CheckoutArgs) -> Result<()> {
-    if !WorkDir::is_valid_path(&args.path)? {
-        return Err(RepoError::InitPathExists(args.path).into());
-    }
+pub fn cmd_checkout(_args: CheckoutArgs) -> Result<()> {
+    println!("wyag does not support the checkout command.");
+    println!("If you want to switch branches, use the switch command.");
+    println!("If you want to restore working directory files, use the restore command.");
 
-    let repo = Repository::find(".")?;
-    let hash = GitObject::find(repo.workdir(), &args.commit)?;
-    let tree = Tree::read_from_commit(repo.workdir(), &hash)?;
-
-    std::fs::create_dir(&args.path)?;
-    tree.checkout(repo.workdir(), args.path)
+    Ok(())
 }
 
 /// Commits staged changes to the current branch.
@@ -272,9 +261,7 @@ fn log_graphviz(wd: &WorkDir, hash: &ObjectHash, seen: &mut HashSet<ObjectHash>)
 
 /// List all the files in the staging index.
 #[derive(Args)]
-pub struct LsFilesArgs {
-    // empty
-}
+pub struct LsFilesArgs { }
 
 pub fn cmd_ls_files(_args: LsFilesArgs) -> Result<()> {
     let repo = Repository::find(".")?;
@@ -313,22 +300,30 @@ pub fn cmd_ls_tree(args: LsTreeArgs) -> Result<()> {
 
 
 #[derive(Args)]
-pub struct MergeArgs {
-    
-}
+pub struct MergeArgs { }
 
 pub fn cmd_merge(_args: MergeArgs) -> Result<()> {
-    Ok(())
+    todo!("not implemented")
 }
 
-
+/// Replace files in the working tree (or index) with those from the index (or commit).
+/// Uncommitted changes may be discarded!
 #[derive(Args)]
-pub struct RebaseArgs {
-    
+pub struct RestoreArgs {
+    /// The source of the files to restore. Defaults to HEAD if --staged, otherwise to the index.
+    pub source: Option<String>,
+    /// Update the index to match the source.
+    #[arg(short, long)]
+    pub staged: bool,
+    /// Update the working directory to match the source. This is the default unless --staged is present.
+    #[arg(short, long)]
+    pub worktree: bool,
+    /// The file or directory to restore.
+    pub path: PathBuf,
 }
 
-pub fn cmd_rebase(_args: RebaseArgs) -> Result<()> {
-    Ok(())
+pub fn cmd_restore(_args: RestoreArgs) -> Result<()> {
+    todo!("not implemented")
 }
 
 /// Determines which object hash a name refers to (if any).
@@ -381,6 +376,21 @@ pub fn cmd_rm(args: RmArgs) -> Result<()> {
 
     index.remove(repo.workdir(), &args.path)?;
     index.write(repo.workdir())?;
+
+    Ok(())
+}
+
+/// List references.
+#[derive(Args)]
+pub struct ShowRefArgs { }
+
+pub fn cmd_show_ref(_args: ShowRefArgs) -> Result<()> {
+    let repo = Repository::find(".")?;
+    let refs = refs::list(repo.workdir())?;
+
+    for (name, hash) in refs {
+        println!("{hash} {name}");
+    }
 
     Ok(())
 }
@@ -438,21 +448,18 @@ pub fn cmd_status(args: StatusArgs) -> Result<()> {
     Ok(())
 }
 
-/// List references.
+/// Updates HEAD, index, and working directory to match the branch or commit.
 #[derive(Args)]
-pub struct ShowRefArgs {
-    // empty
+pub struct SwitchArgs {
+    /// Switch to a detached HEAD state.
+    #[arg(long)]
+    pub detach: bool,
+    /// The branch or commit (if --detach) to switch to.
+    pub branch_or_commit: String,
 }
 
-pub fn cmd_show_ref(_args: ShowRefArgs) -> Result<()> {
-    let repo = Repository::find(".")?;
-    let refs = refs::list(repo.workdir())?;
-
-    for (name, hash) in refs {
-        println!("{hash} {name}");
-    }
-
-    Ok(())
+pub fn cmd_switch(_args: SwitchArgs) -> Result<()> {
+    todo!("not implemented")
 }
 
 /// List, create, or delete tags.

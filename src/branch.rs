@@ -107,6 +107,24 @@ pub fn update_current(wd: &WorkDir, commit_hash: &ObjectHash) -> Result<()> {
     Ok(())
 }
 
+/// Switches the HEAD ref to the branch called `name`.
+pub fn switch(wd: &WorkDir, branch: &Branch) -> Result<()> {
+    let head_path = wd.git_path("HEAD");
+    match branch {
+        Branch::Named(branch_name) => {
+            if !exists(branch_name, wd)? {
+                return Err(BranchError::Nonexistent(branch_name.clone()).into());
+            }
+            std::fs::write(head_path, format!("ref: refs/heads/{branch_name}\n"))?;
+        },
+        Branch::Headless(commit_hash) => {
+            std::fs::write(head_path, format!("{commit_hash}\n"))?;
+        },
+    };
+
+    Ok(())
+}
+
 /// Returns true if the branch called `name` exists.
 pub fn exists(name: &str, wd: &WorkDir) -> Result<bool> {
     match refs::resolve(wd, "heads", name) {

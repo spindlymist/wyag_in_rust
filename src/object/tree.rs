@@ -1,8 +1,8 @@
 use std::{
-    path::Path, collections::{HashSet, BTreeMap}
+    collections::{HashSet, BTreeMap}
 };
 
-use anyhow::{bail, Context};
+use anyhow::Context;
 
 use crate::{Result, workdir::{WorkDir, WorkPathBuf, WorkPath}, index::Index};
 use super::{ObjectError, ObjectHash, ObjectFormat, GitObject};
@@ -18,26 +18,8 @@ pub struct TreeEntry {
 }
 
 impl Tree {
-    pub fn checkout<P>(&self, wd: &WorkDir, path: P) -> Result<()>
-    where
-        P: AsRef<Path>
-    {
-        for (name, entry) in &self.entries {
-            let object_path = path.as_ref().join(name);
-
-            match GitObject::read(wd, &entry.hash)? {
-                GitObject::Blob(blob) => {
-                    std::fs::write(object_path, blob.serialize_into())?;
-                },
-                GitObject::Tree(tree) => {
-                    std::fs::create_dir(&object_path)?;
-                    tree.checkout(wd, object_path)?;
-                },
-                object => bail!("Failed to parse tree (expected tree or blob, got {})", object.get_format()),
-            };
-        }
-
-        Ok(())
+    pub fn restore(&self, _wd: &WorkDir, _target: &WorkPath) -> Result<()> {
+        todo!("not implemented")
     }
 
     pub fn create_from_index(index: &Index, wd: &WorkDir) -> Result<(ObjectHash, GitObject)> {

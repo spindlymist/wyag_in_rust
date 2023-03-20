@@ -26,11 +26,12 @@ pub fn run(cli: Cli) {
         Commands::LsFiles(args) => cmd_ls_files(args),
         Commands::LsTree(args) => cmd_ls_tree(args),
         Commands::Merge(args) => cmd_merge(args),
-        Commands::Rebase(args) => cmd_rebase(args),
+        Commands::Restore(args) => cmd_restore(args),
         Commands::RevParse(args) => cmd_rev_parse(args),
         Commands::Rm(args) => cmd_rm(args),
-        Commands::Status(args) => cmd_status(args),
         Commands::ShowRef(args) => cmd_show_ref(args),
+        Commands::Status(args) => cmd_status(args),
+        Commands::Switch(args) => cmd_switch(args),
         Commands::Tag(args) => cmd_tag(args),
     };
 

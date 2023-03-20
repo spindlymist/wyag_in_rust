@@ -325,7 +325,7 @@ impl Index {
     /// 
     /// The index and working directory are required to match the tip of the current branch.
     /// Subdirectories are removed recursively.
-    pub fn remove<'a, P>(&'a mut self, wd: &WorkDir, path: P) -> Result<()>
+    pub fn remove<P>(&mut self, wd: &WorkDir, path: P) -> Result<()>
     where
         P: AsRef<Path>
     {
