@@ -15,6 +15,7 @@ use crate::{
     branch,
 };
 
+/// A Git repository.
 pub struct Repository {
     workdir: WorkDir,
     config: Ini,
