@@ -71,7 +71,7 @@ where
     }
 }
 
-/// Enumerates all of the refs defined in `repo`.
+/// Enumerates all of the refs defined in the repo.
 pub fn list(wd: &WorkDir) -> Result<Vec<(String, ObjectHash)>> {
     let prev_working_dir = std::env::current_dir()?;
     std::env::set_current_dir(wd.git_path("."))?;
