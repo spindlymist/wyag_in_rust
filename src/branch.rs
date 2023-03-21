@@ -9,12 +9,14 @@ use crate::{
     object::{ObjectHash, GitObject, ObjectFormat}
 };
 
+/// A branch of the repository. Can be a name or a hash (when the repo's HEAD is detached).
 pub enum Branch {
     Named(String),
     Headless(ObjectHash),
 }
 
 impl Branch {
+    /// Returns the commit hash, if any, at the tip of this branch.
     pub fn tip(&self, wd: &WorkDir) -> Result<Option<ObjectHash>> {
         match self {
             Branch::Named(name) => match refs::resolve(wd, "heads", name) {
@@ -29,7 +31,7 @@ impl Branch {
     }
 }
 
-/// Determines the branch pointed to by the HEAD of `repo`.
+/// Determines the branch pointed to by the repo's HEAD.
 pub fn get_current(wd: &WorkDir) -> Result<Branch> {
     let head_path = wd.git_path("HEAD");
     let head_contents = fs::read_to_string(head_path)?;
