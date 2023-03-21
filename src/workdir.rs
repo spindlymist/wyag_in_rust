@@ -103,6 +103,35 @@ impl WorkDir {
         
         Ok(abs_path)
     }
+
+    /// Removes the file or directory at `path` from the file system.
+    pub fn remove_path(&self, path: &WorkPath) -> Result<()> {
+        let abs_path = self.0.join(path);
+
+        if path.is_empty() {
+            // Delete everything except the .git directory (if present)
+            // Note that any .git directories in subdirectories will be deleted
+            for entry in abs_path.read_dir()? {
+                let entry = entry?;
+                let entry_path = entry.path();
+                
+                if entry_path.is_file() {
+                    std::fs::remove_file(&entry_path)?;
+                }
+                else if entry_path.is_dir() && entry.file_name() != ".git" {
+                    std::fs::remove_dir_all(&entry_path)?;
+                }
+            }
+        }
+        else if abs_path.is_dir() {
+            std::fs::remove_dir_all(&abs_path)?;
+        }
+        else if abs_path.is_file() {
+            std::fs::remove_file(&abs_path)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl TryFrom<PathBuf> for WorkDir {

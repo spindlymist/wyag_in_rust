@@ -5,7 +5,7 @@ use std::{
 use anyhow::{Context, bail};
 
 use crate::{Result, workdir::{WorkDir, WorkPathBuf, WorkPath}, index::Index};
-use super::{ObjectError, ObjectHash, ObjectFormat, GitObject};
+use super::{ObjectError, ObjectHash, ObjectFormat, GitObject, Blob};
 
 pub struct Tree {
     pub entries: BTreeMap<WorkPathBuf, TreeEntry>,
@@ -18,35 +18,12 @@ pub struct TreeEntry {
 }
 
 impl Tree {
-    /// Updates the working directory at path `target` to match this tree.
-    /// The existing file or directory at `target` (if any) will be deleted.
-    pub fn restore(&self, wd: &WorkDir, target: &WorkPath) -> Result<()> {
+    /// Copies files from the repository to the working directory at `target`.
+    fn restore_at_path(&self, wd: &WorkDir, target: &WorkPath) -> Result<()> {
         let abs_path = wd.as_path().join(target);
+        wd.remove_path(target)?;
+        std::fs::create_dir_all(&abs_path)?;
 
-        // Remove existing file(s)
-        if abs_path.is_file() {
-            std::fs::remove_file(&abs_path)?;
-        }
-        else if abs_path.is_dir() {
-            // Delete everything except the .git directory (if present)
-            // Note that any .git directories in subdirectories will be deleted
-            for entry in abs_path.read_dir()? {
-                let entry = entry?;
-                let entry_path = entry.path();
-                
-                if entry_path.is_file() {
-                    std::fs::remove_file(&entry_path)?;
-                }
-                else if entry_path.is_dir() && entry.file_name() != ".git" {
-                    std::fs::remove_dir_all(&entry_path)?;
-                }
-            }
-        }
-        else {
-            std::fs::create_dir(&abs_path)?;
-        }
-
-        // Copy files from the repo to the working directory
         for (name, entry) in &self.entries {
             let object_path = target.to_owned().join(name);
         
@@ -56,10 +33,71 @@ impl Tree {
                     std::fs::write(object_abs_path, blob.serialize_into())?;
                 },
                 GitObject::Tree(tree) => {
-                    tree.restore(wd, &object_path)?;
+                    tree.restore_at_path(wd, &object_path)?;
                 },
                 object => bail!("Failed to parse tree (expected tree or blob, got {})", object.get_format()),
             };
+        }
+
+        Ok(())
+    }
+
+    /// Updates the working directory at path `target` to match the tree associated with the specified commit.
+    /// The existing file or directory at `target` (if any) will be deleted.
+    pub fn restore_from_commit(wd: &WorkDir, commit_hash: &ObjectHash, target: &WorkPath) -> Result<()> {
+        let root_tree = Tree::read_from_commit(wd, commit_hash)?;
+        let abs_path = wd.as_path().join(target);
+        wd.remove_path(target)?;
+
+        if target.is_empty() {
+            // Case 1: restore root tree
+            root_tree.restore_at_path(wd, target)?;
+        }
+        else if let Some(entry) = root_tree.find_entry(wd, target)? {
+            if entry.is_dir() {
+                // Case 2: restore subtree
+                let tree = Tree::read(wd, &entry.hash)?;
+                tree.restore_at_path(wd, target)?;
+            }
+            else {
+                // Case 3: restore file
+                if let Some(dir_path) = abs_path.parent() {
+                    std::fs::create_dir_all(dir_path)?;
+                }
+
+                let blob = Blob::read(wd, &entry.hash)?;
+                std::fs::write(abs_path, blob.serialize_into())?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn to_index(&self, wd: &WorkDir, version: Option<u32>) -> Result<Index> {
+        let mut index = Index::new(version);
+        self.add_to_index_recursive(wd, &mut index, &WorkPathBuf::root())?;
+
+        Ok(index)
+    }
+
+    fn add_to_index_recursive(&self, wd: &WorkDir, index: &mut Index, prefix: &WorkPath) -> Result<()> {
+        for (name, entry) in &self.entries {
+            let mut full_path = prefix.to_owned();
+            full_path.push(name);
+
+            if entry.is_dir() {
+                let tree = Tree::read(wd, &entry.hash)?;
+                tree.add_to_index_recursive(wd, index, &full_path)?;
+            }
+            else {
+                let blob = Blob::read(wd, &entry.hash)?;
+                let size = blob.size().try_into().unwrap_or(u32::MAX);
+                index.entries.insert(full_path, crate::index::IndexEntry {
+                    stats: crate::index::stats::FileStats::from_size(size),
+                    hash: entry.hash,
+                    flags: crate::index::flags::EntryFlags::new(name.as_str()),
+                });
+            }
         }
 
         Ok(())

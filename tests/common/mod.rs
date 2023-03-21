@@ -1,7 +1,7 @@
 use std::{fs::{self, File}, path::{PathBuf, Path}};
 
 pub use assert_fs::{prelude::*, TempDir};
-use sevenz_rust;
+
 use anyhow::{Result, Context};
 
 pub fn assert_matches_snapshot<P>(actual: P, snapshot: &str)
@@ -37,7 +37,7 @@ pub fn setup(name: &str, make_subdir: bool) -> Result<TempDir> {
 #[allow(dead_code)] // not actually dead, but `cargo test` thinks it is
 pub fn setup_empty() -> Result<TempDir> {
     let temp_dir = TempDir::new()
-        .with_context(|| format!("Error setting up test environment: failed to create temporary directory"))?;
+        .with_context(|| "Error setting up test environment: failed to create temporary directory".to_string())?;
     std::env::set_current_dir(&temp_dir)
         .context("Error setting up test environment: failed to cd into temporary directory")?;
 
@@ -52,7 +52,7 @@ pub fn unpack_snapshot(name: &str, make_subdir: bool) -> Result<TempDir> {
         .with_context(|| format!("Error unpacking snapshot `{name}`: failed to create temporary directory"))?;
 
     let archive_path: PathBuf = snapshot_path(name);
-    let archive_file = File::open(&archive_path)
+    let archive_file = File::open(archive_path)
         .with_context(|| format!("Error unpacking snapshot `{name}`: no archive with that name"))?;
 
     if make_subdir {

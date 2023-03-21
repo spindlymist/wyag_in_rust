@@ -10,7 +10,7 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 
 use crate::{
     Result,
-    object::ObjectHash,
+    object::{ObjectHash, Blob},
     workdir::{WorkDir, WorkPathBuf, WorkPath}, branch,
 };
 
@@ -367,6 +367,35 @@ impl Index {
 
             for key in keys_to_remove {
                 self.entries.remove(&key);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Updates the working directory at path `target` to match the index.
+    /// The existing file or directory at `target` (if any) will be deleted.
+    pub fn restore(&self, wd: &WorkDir, target: &WorkPath) -> Result<()> {
+        let abs_path = wd.as_path().join(target);
+        wd.remove_path(target)?;
+
+        if let Some(entry) = self.entries.get(target) {
+            // Case 1: restore file
+            let blob = Blob::read(wd, &entry.hash)?;
+            std::fs::write(abs_path, blob.serialize_into())?;
+        }
+        else {
+            // Case 2: possibly restore directory
+            let entries = self.entries_in_dir(target);
+            for (entry_path, entry) in entries {
+                if let Some(dir) = entry_path.parent() {
+                    let dir_path = wd.as_path().join(dir);
+                    std::fs::create_dir_all(&dir_path)?;
+                }
+
+                let blob = Blob::read(wd, &entry.hash)?;
+                let file_path = wd.as_path().join(entry_path);
+                std::fs::write(file_path, blob.serialize_into())?;
             }
         }
 

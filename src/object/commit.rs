@@ -172,13 +172,13 @@ add tests for object::hash").into();
 
     #[test]
     fn rejects_invalid_parent_hash() {
-        let commit_text: Vec<u8> = format!("\
+        let commit_text: Vec<u8> = "\
 tree 44b9ee4ad7dcff749880b916fc6ee3258cc5e764
 parent invalid_hash
 author spindlymist <ocrobin@gmail.com> 1678233745 -0800
 committer spindlymist <ocrobin@gmail.com> 1678233745 -0800
 
-add tests for object::hash").into();
+add tests for object::hash".to_string().into();
 
         let result = Commit::deserialize(commit_text);
         assert!(result.is_err());

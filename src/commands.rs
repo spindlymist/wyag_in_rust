@@ -312,19 +312,55 @@ pub fn cmd_merge(_args: MergeArgs) -> Result<()> {
 #[derive(Args)]
 pub struct RestoreArgs {
     /// The source of the files to restore. Defaults to HEAD if --staged, otherwise to the index.
+    #[arg(short, long)]
     pub source: Option<String>,
     /// Update the index to match the source.
-    #[arg(short, long)]
+    #[arg(short='S', long)]
     pub staged: bool,
     /// Update the working directory to match the source. This is the default unless --staged is present.
-    #[arg(short, long)]
+    #[arg(short='W', long)]
     pub worktree: bool,
     /// The file or directory to restore.
     pub path: PathBuf,
 }
 
-pub fn cmd_restore(_args: RestoreArgs) -> Result<()> {
-    todo!("not implemented")
+pub fn cmd_restore(mut args: RestoreArgs) -> Result<()> {
+    // Handle defaults
+    if !args.staged {
+        args.worktree = true;
+    }
+    else if args.source.is_none() {
+        args.source = Some("HEAD".to_owned());
+    }
+
+    let repo = Repository::find(".")?;
+    let wd = repo.workdir();
+    let path = wd.canonicalize_path(&args.path)?;
+
+    // Update index
+    if args.staged {
+        let source = args.source.as_ref().expect("Source should default to HEAD when --staged is set");
+        let commit_hash = GitObject::find(wd, source)?;
+        let tree = Tree::read_from_commit(wd, &commit_hash)?;
+        let index = tree.to_index(wd, None)?;
+        index.write(wd)?;
+    }
+
+    // Update working directory . . .
+    if args.worktree {
+        if let Some(source) = args.source {
+            // . . . from commit
+            let commit_hash = GitObject::find(wd, &source)?;
+            Tree::restore_from_commit(wd, &commit_hash, &path)?;
+        }
+        else {
+            // . . . from index
+            let index = repo.index()?;
+            index.restore(wd, &path)?;
+        }
+    }
+    
+    Ok(())
 }
 
 /// Determines which object hash a name refers to (if any).
@@ -493,8 +529,7 @@ pub fn cmd_switch(args: SwitchArgs) -> Result<()> {
 
     // Update working directory
     if let Some(hash) = branch::get_current(wd)?.tip(wd)? {
-        let tree = Tree::read_from_commit(wd, &hash)?;
-        tree.restore(wd, &path)?;
+        Tree::restore_from_commit(wd, &hash, &WorkPathBuf::root())?;
     }
     else {
         bail!("Cannot switch branches: branch has no tip");

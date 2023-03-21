@@ -20,6 +20,21 @@ pub struct FileStats {
 }
 
 impl FileStats {
+    pub fn from_size(size: u32) -> Self {
+        Self {
+            ctime_s: 0,
+            ctime_ns: 0,
+            mtime_s: 0,
+            mtime_ns: 0,
+            dev: 0,
+            ino: 0,
+            mode: 0,
+            uid: 0,
+            gid: 0,
+            size,
+        }
+    }
+
     pub fn from_file(file: &File) -> Result<FileStats> {
         let meta = file.metadata()?;
 
