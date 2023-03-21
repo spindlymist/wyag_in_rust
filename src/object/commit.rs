@@ -10,6 +10,10 @@ use crate::{
 
 use super::{ObjectError, ObjectFormat, ObjectHash, GitObject, ObjectMetadata, Tree};
 
+/// A commit is a handle to a snapshot of the working directory's state at a particular time.
+/// 
+/// The working directory's contents at that time can be retrieved by traversing the tree associated with this commit.
+/// A commit also stores references to its parent(s), if any, information about its author, and a description.
 pub struct Commit {
     map: ListOrderedMultimap<String, String>,
     tree: ObjectHash,
@@ -17,6 +21,8 @@ pub struct Commit {
 }
 
 impl Commit {
+    /// Creates a new commit from `index` and stores it in the repo. On success, the
+    /// hash of the new commit object is returned.
     pub fn create(index: &Index, wd: &WorkDir, meta: ObjectMetadata) -> Result<ObjectHash> {
         if index.entries.is_empty() {
             return Err(ObjectError::EmptyIndex.into());
@@ -49,6 +55,7 @@ impl Commit {
         Ok(commit_hash)
     }
 
+    /// Reads and parses the commit with the given hash from the repo.
     pub fn read(wd: &WorkDir, hash: &ObjectHash) -> Result<Commit> {
         match GitObject::read(wd, hash)? {
             GitObject::Commit(commit) => Ok(commit),
@@ -59,14 +66,17 @@ impl Commit {
         }
     }
 
+    /// Returns the hash of the root tree associated with this commit.
     pub fn tree(&self) -> &ObjectHash {
         &self.tree
     }
 
+    /// Returns the hashes of this commit's parent commit(s), if any.
     pub fn parents(&self) -> &[ObjectHash] {
         &self.parents
     }
     
+    /// Parses a `Commit` from a sequence of bytes.
     pub fn deserialize(data: Vec<u8>) -> Result<Commit> {
         let data = std::str::from_utf8(&data)
             .context("Failed to parse commit (invalid Utf-8)")?;
@@ -90,10 +100,12 @@ impl Commit {
         })
     }
 
+    /// Converts the commit into a sequence of bytes.
     pub fn serialize(&self) -> Vec<u8> {
         crate::kvlm::serialize(&self.map).into_bytes()
     }
 
+    /// Consumes the commit and converts it into a sequence of bytes.
     pub fn serialize_into(self) -> Vec<u8> {
         self.serialize()
     }

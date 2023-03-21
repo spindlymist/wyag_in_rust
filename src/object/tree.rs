@@ -7,10 +7,13 @@ use anyhow::{Context, bail};
 use crate::{Result, workdir::{WorkDir, WorkPathBuf, WorkPath}, index::Index};
 use super::{ObjectError, ObjectHash, ObjectFormat, GitObject, Blob};
 
+/// A tree represents one level (directory) in a file hierarchy. Files and subdirectories are recorded
+/// as hashes which map to blobs and trees, respectively.
 pub struct Tree {
     pub entries: BTreeMap<WorkPathBuf, TreeEntry>,
 }
 
+/// A single entry in a [`Tree`], which may represent a file (blob) or subdirectory (tree).
 #[derive(Clone)]
 pub struct TreeEntry {
     pub mode: String,
@@ -46,9 +49,7 @@ impl Tree {
     /// The existing file or directory at `target` (if any) will be deleted.
     pub fn restore_from_commit(wd: &WorkDir, commit_hash: &ObjectHash, target: &WorkPath) -> Result<()> {
         let root_tree = Tree::read_from_commit(wd, commit_hash)?;
-        let abs_path = wd.as_path().join(target);
-        wd.remove_path(target)?;
-
+        
         if target.is_empty() {
             // Case 1: restore root tree
             root_tree.restore_at_path(wd, target)?;
@@ -61,6 +62,9 @@ impl Tree {
             }
             else {
                 // Case 3: restore file
+                wd.remove_path(target)?;
+
+                let abs_path = wd.as_path().join(target);
                 if let Some(dir_path) = abs_path.parent() {
                     std::fs::create_dir_all(dir_path)?;
                 }
@@ -73,6 +77,7 @@ impl Tree {
         Ok(())
     }
 
+    /// Constructs an [`Index`] from this tree.
     pub fn to_index(&self, wd: &WorkDir, version: Option<u32>) -> Result<Index> {
         let mut index = Index::new(version);
         self.add_to_index_recursive(wd, &mut index, &WorkPathBuf::root())?;
@@ -80,6 +85,7 @@ impl Tree {
         Ok(index)
     }
 
+    /// Adds the entries in this tree to `index` under the path `prefix`.
     fn add_to_index_recursive(&self, wd: &WorkDir, index: &mut Index, prefix: &WorkPath) -> Result<()> {
         for (name, entry) in &self.entries {
             let mut full_path = prefix.to_owned();
@@ -103,11 +109,13 @@ impl Tree {
         Ok(())
     }
 
+    /// Generates a tree from `index` and stores it in the repository.
     pub fn create_from_index(index: &Index, wd: &WorkDir) -> Result<(ObjectHash, GitObject)> {
         let prefix = WorkPathBuf::try_from("")?;
         Self::make_subtree(index, wd, &prefix)
     }
 
+    /// Generates a tree from the entries in `index` under the path `prefix` and stores it in the repository.
     fn make_subtree(index: &Index, wd: &WorkDir, prefix: &WorkPath) -> Result<(ObjectHash, GitObject)> {
         let mut entries = BTreeMap::new();
         let mut subtrees_handled: HashSet<&WorkPath> = HashSet::new();
@@ -147,6 +155,8 @@ impl Tree {
         Ok((hash, tree))
     }
 
+    /// Finds the entry associated with `path` relative to this tree. Returns `None`
+    /// if no entry is found.
     pub fn find_entry(&self, wd: &WorkDir, path: &WorkPath) -> Result<Option<TreeEntry>> {
         if let Some(entry) = self.entries.get(path) {
             Ok(Some(entry.clone()))
@@ -165,6 +175,7 @@ impl Tree {
         }
     }
 
+    /// Reads and parses the tree with the given hash from the repo.
     pub fn read(wd: &WorkDir, hash: &ObjectHash) -> Result<Tree> {
         match GitObject::read(wd, hash)? {
             GitObject::Tree(tree) => Ok(tree),
@@ -175,12 +186,14 @@ impl Tree {
         }
     }
 
+    /// Reads and parses the tree associated with the commit with the given hash from the repo.
     pub fn read_from_commit(wd: &WorkDir, commit_hash: &ObjectHash) -> Result<Tree> {
         let commit = super::Commit::read(wd, commit_hash)?;
 
         Self::read(wd, commit.tree())
     }
 
+    /// Parses a `Tree` from a sequence of bytes.
     pub fn deserialize(data: Vec<u8>) -> Result<Tree> {
         let mut entries = BTreeMap::new();
         let mut iter = data.into_iter();
@@ -225,6 +238,7 @@ impl Tree {
         Ok(Tree { entries })
     }
 
+    /// Converts the tree into a sequence of bytes.
     pub fn serialize(&self) -> Vec<u8> {
         let mut data = vec![];
 
@@ -236,6 +250,7 @@ impl Tree {
         data
     }
 
+    /// Consumes the tree and converts it into a sequence of bytes.
     pub fn serialize_into(self) -> Vec<u8> {
         self.serialize()
     }

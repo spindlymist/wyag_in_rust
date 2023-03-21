@@ -5,6 +5,8 @@ use crate::{
     repo::Repository
 };
 
+/// Metadata about certain objects in a repository (namely, commits and annotated tags).
+/// Includes the name and email of the author as well as a descriptive message.
 pub struct ObjectMetadata {
     pub author_name: String,
     pub author_email: String,
@@ -12,6 +14,8 @@ pub struct ObjectMetadata {
 }
 
 impl ObjectMetadata {
+    /// Constructs an `ObjectMetadata` object with the given message and the author info
+    /// from `repo`'s config file. Fails if no user name or email is configured.
     pub fn new(repo: &Repository, message: String) -> Result<ObjectMetadata> {
         let author_name = match repo.get_config("user", "name") {
             Some(val) => val.to_owned(),

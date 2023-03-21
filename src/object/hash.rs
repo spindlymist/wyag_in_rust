@@ -1,5 +1,5 @@
 use std::{
-    path::{PathBuf},
+    path::PathBuf,
     str,
 };
 
@@ -7,12 +7,14 @@ use sha1::{Sha1, Digest};
 
 use super::ObjectError;
 
+/// An SHA-1 hash used to identify an object stored in a Git repository.
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Hash)]
 pub struct ObjectHash {
     pub raw: [u8; 20],
 }
 
 impl ObjectHash {
+    /// Computes the SHA-1 hash of `data`.
     pub fn new(data: impl AsRef<[u8]>) -> ObjectHash {
         let raw = Sha1::new()
             .chain_update(data)
@@ -24,6 +26,9 @@ impl ObjectHash {
         ObjectHash { raw }
     }
 
+    /// Constructs the path to the object with this hash relative to a repo's
+    /// objects directory. When converted to a hex string, the first two digits
+    /// are the subdirectory name and the last 38 are the file name.
     pub fn to_path(&self) -> PathBuf {
         let hash_string = self.to_string();
         let directory = &hash_string[..2];

@@ -39,7 +39,8 @@ pub use tag::Tag;
 mod tree;
 pub use tree::{Tree, TreeEntry};
 
-
+/// An object saved to a Git repository. This may be a commit, a
+/// blob (i.e. a file), a tree (i.e. a directory), or a tag.
 pub enum GitObject {
     Blob(Blob),
     Commit(Commit),
@@ -68,7 +69,7 @@ impl GitObject {
         }
     }
 
-    /// Converts the object into a sequence of bytes.
+    /// Consumes the object and converts it into a sequence of bytes.
     pub fn serialize_into(self) -> Vec<u8> {
         match self {
             GitObject::Blob(inner) => inner.serialize_into(),
@@ -107,9 +108,9 @@ impl GitObject {
         Self::deserialize(data, format)
     }
 
-    /// Finds the object in `repo` uniquely identified by `id`.
+    /// Finds the object uniquely identified by `id`.
     /// 
-    /// The identifier may be a (possibly abbreviated) hash, a branch name, a tag, or "HEAD".
+    /// The identifier may be a (possibly abbreviated) hash, a branch name, a tag, or `"HEAD"`.
     pub fn find(wd: &WorkDir, id: &str) -> Result<ObjectHash> {
         let matches = Self::resolve(wd, id)?;
 
@@ -125,7 +126,7 @@ impl GitObject {
 
     /// Finds all object hashes that `id` could refer to.
     /// 
-    /// The identifier may be a (possibly abbreviated) hash, a branch name, a tag, or "HEAD".
+    /// The identifier may be a (possibly abbreviated) hash, a branch name, a tag, or `"HEAD"`.
     fn resolve(wd: &WorkDir, id: &str) -> Result<Vec<ObjectHash>> {
         let mut candidates = vec![];
 
@@ -180,7 +181,7 @@ impl GitObject {
         Ok(candidates)
     }
 
-    /// Read the object that hashes to `hash` from `repo`.
+    /// Reads and parses the object with the given hash from the repo.
     pub fn read(wd: &WorkDir, hash: &ObjectHash) -> Result<GitObject> {
         // Read and decompress
         let mut bytes = {
@@ -219,9 +220,9 @@ impl GitObject {
         Self::deserialize(data, format)
     }
 
-    /// Parse header "<format> <size>\0" where
-    ///     <format> is blob, commit, tag, or tree
-    ///     <size> is in ASCII base 10
+    /// Parses an object header. The format is `format size\0` where
+    /// - `format` is the type of object as one of the followed strings: `"blob"`, `"commit"`, `"tag"`, or `"tree"`
+    /// - `size` is the byte size of the object written as a string in base 10
     fn parse_header(bytes: &[u8]) -> core::result::Result<(ObjectFormat, usize), String> {
         let header = str::from_utf8(bytes)
             .map_err(|_| "invalid Utf-8 sequence".to_owned())?;
@@ -247,7 +248,7 @@ impl GitObject {
         hash
     }
 
-    /// Store the object in `repo`.
+    /// Store the object in the repo.
     pub fn write(&self, wd: &WorkDir) -> Result<ObjectHash> {
         let (hash, data) = self.prepare_for_storage();
 
