@@ -13,6 +13,7 @@ mod workpath;
 pub use workpath::WorkPath;
 pub use workpath::WorkPathBuf;
 
+/// The working directory of a Git repository.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WorkDir(PathBuf);
 
@@ -30,6 +31,8 @@ impl WorkDir {
         &self.0
     }
 
+    /// Returns true if `path` is suitable for creating a new repository (empty or
+    /// nonexistent directory).
     pub fn is_valid_path<P>(path: P) -> Result<bool>
     where
         P: AsRef<Path>

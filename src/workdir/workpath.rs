@@ -2,19 +2,27 @@ use std::{ops::Deref, borrow::Borrow, path::{Path, PathBuf}, fmt, ffi::OsString}
 
 use super::WorkDirError;
 
+/// A normalized path relative to a working directory.
+/// 
+/// Viewed as a string, a `WorkPath` is always valid Utf-8, always uses `/` as a path separator,
+/// never begins or ends with a slash, and never contains the components `.git`, `.`, or `..`.
 #[repr(transparent)]
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct WorkPath(str);
 
+/// The owned variant of a [`WorkPath`].
 #[repr(transparent)]
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Debug)]
 pub struct WorkPathBuf(String);
 
 impl WorkPath {
+    /// Turns a `str` slice into a `WorkPath`. This works because, thanks to `repr(transparent)`,
+    /// the two types are guaranteed identical in memory.
     unsafe fn from_str(slice: &str) -> &Self {
         std::mem::transmute(slice)
     }
 
+    /// Returns true if this is the empty (or root) path.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -53,6 +61,8 @@ impl WorkPath {
         }
     }
 
+    /// Returns the path to the directory that contains this path.
+    /// If this path is the root directory, `None` is returned.
     pub fn parent(&self) -> Option<&Self> {
         if self.0.is_empty() {
             None
@@ -68,6 +78,8 @@ impl WorkPath {
         }
     }
 
+    /// Returns the name of the file at this path (in other words, the final component).
+    /// If this path is the root directory, the empty path is returned.
     pub fn file_name(&self) -> &Self {
         if let Some(last_sep_idx) = self.0.rfind('/') {
             let slice = &self.0[last_sep_idx + 1..];
@@ -78,6 +90,8 @@ impl WorkPath {
         }
     }
 
+    /// Splits the path between its first and second components.
+    /// If there is only one component, the second element of the tuple will be `None`.
     pub fn partition(&self) -> (&Self, Option<&Self>) {
         if let Some((first, rest)) = self.0.split_once('/') {
             unsafe {
@@ -125,10 +139,12 @@ impl fmt::Display for WorkPath {
 }
 
 impl WorkPathBuf {
+    /// Creates a new `WorkPathBuf` from the empty (or root) path.
     pub fn root() -> Self {
         Self("".to_owned())
     }
 
+    /// Concatenates `path` to end of this path.
     pub fn push(&mut self, path: &WorkPath) {
         if !self.0.is_empty() {
             self.0.push('/');
@@ -136,6 +152,7 @@ impl WorkPathBuf {
         self.0.push_str(&path.0);
     }
 
+    /// Removes the last component of this path, if any. Returns `true` if a component was removed.
     pub fn pop(&mut self) -> bool {
         if self.0.is_empty() {
             return false;
@@ -147,6 +164,7 @@ impl WorkPathBuf {
         true
     }
 
+    /// Creates a new path by concatenating `path` to the end of this path.
     pub fn join(&self, path: &WorkPath) -> WorkPathBuf {
         let mut new_path = self.clone();
         new_path.push(path);
