@@ -402,7 +402,7 @@ impl Index {
         Ok(())
     }
 
-    /// Overwrites the index file of `repo` with this index.
+    /// Overwrites the repo's index file with this index.
     pub fn write(&self, wd: &WorkDir) -> Result<()> {
         if self.entries.is_empty() {
             return Err(IndexError::EmptyIndex.into());

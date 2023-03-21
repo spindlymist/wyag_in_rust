@@ -10,6 +10,7 @@ use crate::{
     object::{GitObject, ObjectHash, Tree, ObjectFormat, TreeEntry},
 };
 
+/// A change to a file in the working directory relative to the index.
 pub enum UnstagedChange {
     Created {
         path: WorkPathBuf,
@@ -26,6 +27,7 @@ pub enum UnstagedChange {
     },
 }
 
+/// A change to a file in the index relative to a commit.
 pub enum StagedChange {
     Created {
         path: WorkPathBuf,

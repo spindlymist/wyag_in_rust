@@ -1,16 +1,19 @@
-///   A 16-bit 'flags' field split into (high to low bits)
+/// Git flags for a file in the index.
 /// 
-///     1-bit assume-valid flag
-///     1-bit extended flag (must be zero in version 2)
-///     2-bit stage (during merge)
-///     12-bit name length if the length is less than 0xFFF; otherwise 0xFFF
-///     is stored in this field.
-///     (Version 3 or later) A 16-bit field, only applicable if the
-///     "extended flag" above is 1, split into (high to low bits).
-///     1-bit reserved for future
-///     1-bit skip-worktree flag (used by sparse checkout)
-///     1-bit intent-to-add flag (used by "git add -N")
-///     13-bit unused, must be zero
+/// From git's documentation (https://git-scm.com/docs/index-format):
+/// 
+/// > A 16-bit 'flags' field split into (high to low bits):
+/// > - 1-bit assume-valid flag
+/// > - 1-bit extended flag (must be zero in version 2)
+/// > - 2-bit stage (during merge)
+/// > - 12-bit name length if the length is less than 0xFFF; otherwise 0xFFF
+/// > - is stored in this field.
+/// > - (Version 3 or later) A 16-bit field, only applicable if the
+/// > - "extended flag" above is 1, split into (high to low bits).
+/// > - 1-bit reserved for future
+/// > - 1-bit skip-worktree flag (used by sparse checkout)
+/// > - 1-bit intent-to-add flag (used by "git add -N")
+/// > - 13-bit unused, must be zero
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub struct EntryFlags {
     pub(super) basic_flags: u16,

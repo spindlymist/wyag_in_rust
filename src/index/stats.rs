@@ -5,6 +5,7 @@ use std::{
 
 use crate::Result;
 
+/// Stats for a file in the index, such as size and modification time.
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub struct FileStats {
     pub (super) ctime_s: u32,
