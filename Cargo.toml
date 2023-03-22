@@ -2,7 +2,7 @@
 name = "wyag"
 version = "0.1.0"
 edition = "2021"
-description = "A simplified git implementation following a guide by Thibault Polge"
+description = "A simplified clone of Git."
 authors = [ "Robin O'Connell" ]
 license = "Apache-2.0"
 
